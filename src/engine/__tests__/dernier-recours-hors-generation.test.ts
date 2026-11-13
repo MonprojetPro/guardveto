@@ -42,7 +42,7 @@ function input(vets: VetEngine[]): SolverInput {
     dateFin: DATE_FIN,
     saison: 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     lnsTimeoutMs: 2000,
   }
 }

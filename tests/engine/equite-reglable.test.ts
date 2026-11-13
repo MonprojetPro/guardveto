@@ -52,7 +52,7 @@ const BASE: SolverInput = {
   dateFin: '2026-02-01',
   saison: 'hiver',
   vets: vetsSimples(),
-  bonusMalus: {},
+  reportEquite: {},
   lnsTimeoutMs: 0, // → seed greedy pur, déterministe
 }
 
@@ -202,12 +202,16 @@ function makeBuilder(table: string) {
   builder.gte = chain
   builder.lt = chain
   builder.or = chain
+  builder.in = chain // B-196 — lecture des bilans des périodes antérieures
   builder.order = chain
   builder.limit = chain
   builder.single = () => Promise.resolve({ data: dataFor(table), error: null })
   builder.maybeSingle = () => Promise.resolve({ data: null, error: null }) // pas de période précédente
+  // `periodes` se lit des deux façons : `.single()` (la période à générer)
+  // et sans terminateur (la LISTE des périodes antérieures du grand livre
+  // d'équité, B-196 lot 0). Cf. le même commentaire dans loader-zone.test.
   builder.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
-    resolve({ data: dataFor(table), error: null })
+    resolve({ data: table === 'periodes' ? [] : dataFor(table), error: null })
   return builder
 }
 

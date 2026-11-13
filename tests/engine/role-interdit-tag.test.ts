@@ -63,7 +63,7 @@ describe('role_interdit_tag — moteur (règle dure)', () => {
     const input: SolverInput = {
       ...PERIODE,
       vets: EQUIPE,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(regle()),
     }
@@ -82,7 +82,7 @@ describe('role_interdit_tag — moteur (règle dure)', () => {
     const input: SolverInput = {
       ...PERIODE,
       vets: EQUIPE,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(regle({ creneaux: ['weekend'] })),
     }
@@ -103,7 +103,7 @@ describe('role_interdit_tag — moteur (règle dure)', () => {
     const result = genererPlanningPur({
       ...PERIODE,
       vets: tousJuniors,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(regle({ etage: 4 })),
     })
@@ -161,7 +161,7 @@ describe('role_interdit_tag — validateur indépendant', () => {
   it('ACCORD des deux gardiens : le planning généré passe le validateur', () => {
     const structureConfig = structureAvec(regle())
     const result = genererPlanningPur({
-      ...PERIODE, vets: EQUIPE, bonusMalus: {}, lnsTimeoutMs: 0, structureConfig,
+      ...PERIODE, vets: EQUIPE, reportEquite: {}, lnsTimeoutMs: 0, structureConfig,
     })
     expect(result.success).toBe(true)
     if (!result.success) return

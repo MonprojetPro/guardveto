@@ -45,7 +45,7 @@ const EQUIPE = () => [
 function input(vets: VetEngine[], placesFigees?: SolverInput['placesFigees']): SolverInput {
   return {
     dateDebut: DATE_DEBUT, dateFin: DATE_FIN, saison: 'hiver',
-    vets, bonusMalus: {}, lnsTimeoutMs: 2000, placesFigees,
+    vets, reportEquite: {}, lnsTimeoutMs: 2000, placesFigees,
   }
 }
 

@@ -20,6 +20,12 @@ import impasseData from './scenarios/impasse.json'
 interface ScenarioSolver {
   periode: { dateDebut: string; dateFin: string; saison: string }
   vets: unknown[]
+  /**
+   * Report d'équité du scénario, à l'ancien format : UN nombre, qui ne
+   * portait que les week-ends. Les fichiers de scénario sont des données
+   * figées — on les lit tels quels et on les traduit ici (B-196 lot 0),
+   * plutôt que de réécrire des jeux d'essai pour une question de forme.
+   */
   bonusMalus?: Record<string, number>
 }
 
@@ -29,7 +35,15 @@ function buildInput(scenario: ScenarioSolver): SolverInput {
     dateFin: scenario.periode.dateFin,
     saison: scenario.periode.saison as 'hiver' | 'ete',
     vets: scenario.vets as unknown as VetEngine[],
-    bonusMalus: scenario.bonusMalus ?? {},
+    // ⚠️ Transmis POUR DE VRAI. Le remplacement en bloc du 2026-11-13 a
+    // d'abord écrit `{}` ici : le scénario portait son report, le solveur
+    // n'en voyait plus rien, et le test ci-dessous passait quand même —
+    // il n'assertait rien. Un test creux ne tombe jamais.
+    reportEquite: Object.fromEntries(
+      Object.entries(scenario.bonusMalus ?? {}).map(([id, we]) => [
+        id, { we, semaine: 0, feries: 0 },
+      ]),
+    ),
   }
 }
 
@@ -145,20 +159,20 @@ describe('Scénario ete-conges-lourds — 4 semaines, congés semaines 3-4', () 
     expect(compterType(result.planning, 'weekend')).toBe(4)
   })
 
-  it('le bonus/malus est pris en compte (e-v1 doit plus de gardes)', () => {
+  it('le report d’équité ARRIVE jusqu’au solveur (il n’est pas perdu en route)', () => {
+    // Ce test ne juge PAS le nombre de gardes obtenu : e-v2 est aussi en
+    // congé deux semaines, donc l'effet du report y est noyé — c'est ce
+    // qui rendait l'ancienne version de ce test creuse
+    // (`toBeGreaterThanOrEqual(0)` sur les deux : toujours vrai).
+    //
+    // Ce qu'il prouve : le report du scénario traverse `buildInput` et
+    // atteint `SolverInput`. L'effet du report sur le planning, lui, est
+    // mesuré sur des cas isolés dans `report-equite-moteur.test.ts`.
+    expect(input.reportEquite['e-v1']).toEqual({ we: 1, semaine: 0, feries: 0 })
+    expect(input.reportEquite['e-v2']).toEqual({ we: -1, semaine: 0, feries: 0 })
     if (!result.success) return
-    // e-v1 a bonusMalus=1 (doit plus de gardes) → devrait avoir plus de gardes que e-v2
-    const gardesV1 = result.planning.attributions.filter(
-      (a) => estAttribue(a, 'e-v1')
-    ).length
-    const gardesV2 = result.planning.attributions.filter(
-      (a) => estAttribue(a, 'e-v2')
-    ).length
-    // e-v2 a bonusMalus=-1 (a déjà fait plus) → devrait en faire moins
-    // e-v2 est aussi en congé les 2 dernières semaines
-    // On vérifie juste que la contrainte congé est respectée (gardes avant sem 3 uniquement)
-    expect(gardesV1).toBeGreaterThanOrEqual(0)
-    expect(gardesV2).toBeGreaterThanOrEqual(0)
+    expect(result.planning.attributions.filter((a) => estAttribue(a, 'e-v1')).length)
+      .toBeGreaterThan(0)
   })
 
   it('génère en moins de 5 secondes', () => {
@@ -212,7 +226,7 @@ describe('Benchmark performance — 12 semaines hiver, 7 vétos sans contraintes
       dateFin: '2026-11-29',    // 12 semaines plus tard (dimanche)
       saison: 'hiver',
       vets,
-      bonusMalus: {},
+      reportEquite: {},
     }
 
     const result = genererPlanningPur(input)
@@ -246,7 +260,7 @@ describe('Benchmark performance — 12 semaines hiver, 7 vétos sans contraintes
       dateFin: '2026-11-29', // 12 semaines
       saison: 'hiver',
       vets,
-      bonusMalus: {},
+      reportEquite: {},
     }
     const result = genererPlanningPur(input)
     expect(result.success).toBe(true)

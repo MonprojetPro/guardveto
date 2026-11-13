@@ -141,7 +141,7 @@ describe('P4 — roleAvantageFinancier=null traverse le moteur (end-to-end)', ()
     dateFin: '2026-01-18', // 2 semaines
     saison: 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
   }
 
   it('null → planning valide (aucune violation)', () => {

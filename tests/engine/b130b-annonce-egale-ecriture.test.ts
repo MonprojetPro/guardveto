@@ -46,7 +46,7 @@ function vet(id: string, prenom: string, conges: VetEngine['conges'] = []): VetE
 }
 
 function input(vets: VetEngine[]): SolverInput {
-  return { dateDebut: DATE_DEBUT, dateFin: DATE_FIN, saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 2000 }
+  return { dateDebut: DATE_DEBUT, dateFin: DATE_FIN, saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 2000 }
 }
 
 const CONGE_TOTAL = [{ date_debut: DATE_DEBUT, date_fin: DATE_FIN, type: 'vacances' as const }]

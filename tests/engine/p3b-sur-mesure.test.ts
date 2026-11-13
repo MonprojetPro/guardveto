@@ -66,7 +66,7 @@ function inputBase(creneaux?: CreneauModele[]): SolverInput {
     dateFin: DATE_FIN,
     saison: 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     creneaux,
   }
 }

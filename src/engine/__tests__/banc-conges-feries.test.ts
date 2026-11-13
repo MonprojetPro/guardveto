@@ -52,7 +52,7 @@ function makeInput(
     dateFin: PERIODE_PILOTE.dateFin,
     saison: PERIODE_PILOTE.saison,
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     calendrier: {
       feries: new Set(feries),
       vacancesScolaires: CALENDRIER_PILOTE.vacancesScolaires.map((v) => ({ ...v })),

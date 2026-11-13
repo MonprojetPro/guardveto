@@ -81,7 +81,7 @@ const input: SolverInput = {
   dateFin: hiverStandard.periode.dateFin,
   saison: hiverStandard.periode.saison as 'hiver',
   vets,
-  bonusMalus: {},
+  reportEquite: {},
 }
 
 const result = genererPlanningPur(input)

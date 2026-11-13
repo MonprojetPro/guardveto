@@ -38,7 +38,7 @@ function makeInputImpasse(): SolverInput {
     dateFin: DATE_FIN,
     saison: 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     lnsTimeoutMs: 0,
   }
 }
@@ -92,7 +92,7 @@ describe('Diagnostic d’impasse (Lot 1) — créneau bloquant fiable', () => {
     ]
     const input: SolverInput = {
       dateDebut: DATE_DEBUT, dateFin: DATE_FIN, saison: 'hiver',
-      vets, bonusMalus: {}, lnsTimeoutMs: 0,
+      vets, reportEquite: {}, lnsTimeoutMs: 0,
     }
     const result = genererPlanningPur(input)
     expect(result.success).toBe(true)
@@ -122,7 +122,7 @@ describe('Diagnostic d’impasse (Lot 2/3) — raisons + suggestions', () => {
     ]
     const input: SolverInput = {
       dateDebut: DATE_DEBUT, dateFin: DATE_FIN, saison: 'hiver',
-      vets, bonusMalus: {}, lnsTimeoutMs: 0,
+      vets, reportEquite: {}, lnsTimeoutMs: 0,
     }
     const result = genererPlanningPur(input)
     expect(result.success).toBe(false)
@@ -169,7 +169,7 @@ describe('Diagnostic d’impasse (Lot 2/3) — raisons + suggestions', () => {
     // Lun 03/11 → Jeu 06/11 : pas de vendredi ni de week-end (impasse minimale).
     const input: SolverInput = {
       dateDebut: '2025-11-03', dateFin: '2025-11-06', saison: 'ete',
-      vets, bonusMalus: {}, lnsTimeoutMs: 0,
+      vets, reportEquite: {}, lnsTimeoutMs: 0,
     }
     const result = genererPlanningPur(input)
     expect(result.success).toBe(false)

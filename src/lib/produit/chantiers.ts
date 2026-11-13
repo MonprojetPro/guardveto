@@ -74,25 +74,45 @@ export const CHANTIERS: Record<string, Chantier> = {
         'bascule ». Photographie du Val d Allier prise juste avant (B-184).',
     },
   },
-  // `reglages-v2` (B-202) a vecu ici du 10 au 12/11 : bac a sable seul, puis
-  // ouvert a tous le 11/11. RETIRE par B-202b le 12/11, en meme temps que
-  // l'ancien ecran Reglages : sans second rendu, repasser la ligne en
-  // `bacASableSeulement` n'aurait rien ramene — l'onglet aurait disparu chez
-  // le client, a l'inverse de ce que promet « revenir en arriere » ci-dessus.
-  // Un chantier ne quitte ce registre qu'avec son ancien rendu.
+  'reglages-v2': {
+    nom: 'Réglages — l’onglet refondu (sommaire et cinq sections)',
+    item: 'B-202',
+    depuis: '2026-11-10',
+    diffusion: {
+      tousLesCabinets:
+        'Maquette validee par MiKL le 10/11 (docs/maquettes/B-202-reglages.html), ' +
+        'recette au bac a sable du 10 au 11/11. Bascule decidee par MiKL le 11/11 : ' +
+        '« c est bon fais la bascule ». Aucune donnee touchee : seul le dessin change.',
+    },
+  },
   'boutons-relief': {
     nom: 'Boutons — le système « Relief » (une seule feuille pour tous les boutons)',
     item: 'B-206',
     depuis: '2026-11-12',
     diffusion: {
-      tousLesCabinets:
-        'Direction A choisie par MiKL le 12/11 sur docs/maquettes/B-206-boutons.html, ' +
-        'generalisee a tout le site le meme jour (B-206a), au bac a sable seul. Bascule ' +
-        'decidee par MiKL le 13/11 : « c est parfait, deploie le sur tous les comptes ». ' +
-        'Ce chantier ne rend aucun composant : il pose l attribut data-boutons sur la ' +
-        'coquille V2 et sur les pages de connexion, et styles/v2-boutons.css ne s applique ' +
-        'que sous cet attribut. Revenir en arriere = repasser cette ligne en ' +
-        'bacASableSeulement ; les anciens styles sont encore en place (retrait : B-206c).',
+      bacASableSeulement:
+        'Direction A choisie par MiKL le 12/11 sur docs/maquettes/B-206-boutons.html. ' +
+        'Branchement ecran par ecran (lot 1 : Planning, socle .btn, boutons des fenetres). ' +
+        'Le Val d Allier ne bascule que sur validation de MiKL (B-206a). Ce chantier ne ' +
+        'rend aucun composant : il pose l attribut data-boutons sur la coquille V2, et ' +
+        'styles/v2-boutons.css ne s applique que sous cet attribut.',
+    },
+  },
+  'equite-grand-livre': {
+    nom: 'Equite — le grand livre (cumul de toutes les periodes, 3 dimensions)',
+    item: 'B-196',
+    depuis: '2026-11-13',
+    diffusion: {
+      bacASableSeulement:
+        'Lot 0 du chantier « repenser la generation » (strategie du 10/11). Feu vert ' +
+        'de MiKL le 13/11 sur le tableau des lecteurs. ⚠️ CONTRAIREMENT AUX AUTRES ' +
+        'CHANTIERS, celui-ci ne change pas un DESSIN mais le COMPORTEMENT DU MOTEUR : ' +
+        'ferme, le report reste celui d avant (ecart_we de la seule periode ' +
+        'precedente) ; ouvert, il cumule toutes les periodes de gardes closes sur ' +
+        'trois dimensions, plafonne a 1 week-end / 2 gardes de semaine / 1 ferie par ' +
+        'periode. Le repli est donc le comportement ACTUEL, pas l absence de report : ' +
+        'fermer ce chantier ne doit RIEN retirer au Val d Allier. Bascule apres recette ' +
+        'de MiKL sur une generation reelle au bac a sable.',
     },
   },
 }

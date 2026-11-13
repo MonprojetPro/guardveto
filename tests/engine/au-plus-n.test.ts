@@ -196,7 +196,7 @@ describe('au_plus_n + creneaux — FAIT DIRECT en génération complète', () =>
     dateFin: hiverStandard.periode.dateFin,
     saison: hiverStandard.periode.saison as 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
   }
   const result = genererPlanningPur(input)
 

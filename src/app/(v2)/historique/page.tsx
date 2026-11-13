@@ -29,13 +29,14 @@ import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
 import { chargerSoirsDeFete } from '@/lib/compteurs/fetesParSoir'
 import { chargerDock } from '@/data/v2/dock'
 import { calculerBilans } from '@/engine/bilan'
+import { chargerGrandLivrePourAffichage } from '@/data/grandLivreEquite'
+import { effectifPourGeneration } from '@/engine/effectif'
 import {
   queryCompteurs,
   queryCompteursPlage,
   completerCompteursPourAffichage,
   queryTotalWE,
   queryDepannages,
-  queryBonusMalusHeritage,
   queryBonusMalusCourant,
   queryVetsInfo,
   queryHistoriqueFetes,
@@ -239,7 +240,11 @@ export default async function HistoriquePage({
   // compteurs en a besoin pour ne laisser personne de côté (juste en dessous).
   const { data: actifsDb } = await supabase
     .from('veterinaires')
-    .select('id, prenom, nom, statut, couleur')
+    // B-196 lot 0 — `dernier_recours` est chargé POUR L'ÉQUITÉ : le grand
+    // livre doit avoir exactement le même périmètre qu'à la génération
+    // (`effectifPourGeneration`). Sans ce champ, cet écran annoncerait un
+    // rattrapage pour quelqu'un que le moteur n'appelle jamais.
+    .select('id, prenom, nom, statut, couleur, dernier_recours')
     .eq('actif', true)
     .order('nom')
   const vetsActifs = (actifsDb ?? []) as Array<{
@@ -248,7 +253,9 @@ export default async function HistoriquePage({
     nom: string
     statut: 'associe' | 'salarie'
     couleur: string
+    dernier_recours: boolean
   }>
+  const vetsActifsPourEquite = effectifPourGeneration(vetsActifs)
 
   // ── Personne ne disparaît du tableau ───────────────────────────────────
   // Un vétérinaire sans aucune garde sur le filtre courant n'a PAS de ligne
@@ -416,10 +423,24 @@ export default async function HistoriquePage({
   const afficherBilan =
     estAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
 
-  const [bonusMalusHeritage, bonusMalusCourant, vetsInfo, historiqueFetes] = await Promise.all([
+  // B-196 lot 0 — le grand livre d'équité, lu par la MÊME fonction que le
+  // moteur (`data/grandLivreEquite`). Avant, cet écran lisait l'écart de
+  // week-ends de la seule période précédente et l'affichait comme « le
+  // report » : il disait donc une autre chose que le moteur, sans que rien
+  // ne le signale. Le périmètre est l'effectif réel, dernier recours exclu,
+  // exactement comme à la génération.
+  const [grandLivre, bonusMalusCourant, vetsInfo, historiqueFetes] = await Promise.all([
     estAdmin && mode === 'periode'
-      ? queryBonusMalusHeritage(supabase, periodeSelectionnee, periodes)
-      : Promise.resolve([]),
+      ? chargerGrandLivrePourAffichage(
+          supabase,
+          periodeSelectionnee.date_debut,
+          vetsActifsPourEquite.map((v) => v.id),
+          // Isolation EXPLICITE du cabinet, comme à la génération : la RLS
+          // couvre déjà ce chemin utilisateur, mais le filtre dit ici, noir
+          // sur blanc, sur quoi porte le cumul.
+          (vet as { cabinet_id?: string | null }).cabinet_id ?? undefined,
+        )
+      : Promise.resolve({ cumul: {}, report: {}, nbPeriodes: 0, erreur: null }),
     afficherBilan ? queryBonusMalusCourant(supabase, periodeSelectionnee.id) : Promise.resolve([]),
     afficherBilan ? queryVetsInfo(supabase) : Promise.resolve([]),
     estAdmin ? queryHistoriqueFetes(supabase) : Promise.resolve([]),
@@ -462,7 +483,7 @@ export default async function HistoriquePage({
                 periodeId={periodeSelectionnee.id}
                 periodeStatut={periodeSelectionnee.statut}
                 existingBilan={bonusMalusCourant}
-                heritage={bonusMalusHeritage}
+                grandLivre={grandLivre}
                 vetsInfo={vetsInfo}
               />
             ) : undefined

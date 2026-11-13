@@ -78,7 +78,7 @@ function placesPourvuesParNuit(nbPlaces: number, nbVetosSemaineSoir?: number): n
     ...SEMAINE,
     saison: 'ete',
     vets: VETS,
-    bonusMalus: {},
+    reportEquite: {},
     lnsTimeoutMs: 0,
     creneaux: catalogueSoirSemaine(nbPlaces),
     nbVetosSemaineSoir,
@@ -155,7 +155,7 @@ describe('Sans surcharge de planning, la structure des gardes décide', () => {
       ...SEMAINE,
       saison: 'hiver',
       vets: VETS,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       creneaux: catalogueSoirSemaine(4),
     })
@@ -186,7 +186,7 @@ describe('Sans AUCUNE structure de gardes, le repli saison reste', () => {
   // été = 1 » survit — et il ne concerne aucun cabinet réel.
   it('été sans catalogue → 1 par nuit', () => {
     const res = genererPlanningPur({
-      ...SEMAINE, saison: 'ete', vets: VETS, bonusMalus: {}, lnsTimeoutMs: 0,
+      ...SEMAINE, saison: 'ete', vets: VETS, reportEquite: {}, lnsTimeoutMs: 0,
     })
     expect(res.success).toBe(true)
     if (!res.success) return
@@ -198,7 +198,7 @@ describe('Sans AUCUNE structure de gardes, le repli saison reste', () => {
 
   it('hiver sans catalogue → 2 par nuit', () => {
     const res = genererPlanningPur({
-      ...SEMAINE, saison: 'hiver', vets: VETS, bonusMalus: {}, lnsTimeoutMs: 0,
+      ...SEMAINE, saison: 'hiver', vets: VETS, reportEquite: {}, lnsTimeoutMs: 0,
     })
     expect(res.success).toBe(true)
     if (!res.success) return

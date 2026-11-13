@@ -312,7 +312,7 @@ describe('#17 — génération complète (pilote, seed greedy)', () => {
       dateFin: PERIODE_PILOTE.dateFin,
       saison: PERIODE_PILOTE.saison,
       vets: VETS_PILOTE as VetEngine[],
-      bonusMalus: {},
+      reportEquite: {},
       calendrier: {
         feries: new Set(CALENDRIER_PILOTE.feries),
         vacancesScolaires: CALENDRIER_PILOTE.vacancesScolaires.map((v) => ({ ...v })),

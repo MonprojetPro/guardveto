@@ -32,7 +32,7 @@ function inputPilote(): SolverInput {
       contraintes: v.contraintes.map((c) => ({ ...c, config: structuredClone(c.config) })),
       conges: v.conges.map((g) => ({ ...g })),
     })) as VetEngine[],
-    bonusMalus: {},
+    reportEquite: {},
     calendrier: {
       feries: new Set(CALENDRIER_PILOTE.feries),
       vacancesScolaires: CALENDRIER_PILOTE.vacancesScolaires.map((v) => ({ ...v })),

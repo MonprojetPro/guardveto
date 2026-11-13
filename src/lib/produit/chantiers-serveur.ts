@@ -44,6 +44,38 @@ export async function estBacASable(
 }
 
 /**
+ * Ce cabinet-LA est-il marque bac a sable ?
+ *
+ * Variante de `estBacASable` qui prend le cabinet en parametre au lieu de le
+ * deduire de l'utilisateur connecte. Indispensable aux chemins qui savent
+ * deja sur quel cabinet ils travaillent et qui tournent parfois SANS
+ * utilisateur — la generation, le cron de verrouillage, un replay. La
+ * version « connecte » y rendrait `false` par accident de contexte, et le
+ * cabinet perdrait son chantier sans que personne ne comprenne pourquoi.
+ *
+ * Meme repli sur : une panne de lecture rend `false`, donc l'ecran ou le
+ * comportement DEJA RECETTE.
+ */
+export async function cabinetEstBacASable(
+
+  supabase: SupabaseClient<any, any, any>,
+  cabinetId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('cabinets')
+      .select('est_bac_a_sable')
+      .eq('id', cabinetId)
+      .maybeSingle()
+
+    if (error) return false
+    return Boolean((data as { est_bac_a_sable?: boolean } | null)?.est_bac_a_sable)
+  } catch {
+    return false
+  }
+}
+
+/**
  * Le contexte de diffusion du cabinet connecte, pret a passer a
  * `chantierOuvert`.
  */

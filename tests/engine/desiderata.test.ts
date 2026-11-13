@@ -40,7 +40,7 @@ function pref(type: ContrainteEngine['type'], params: Record<string, unknown>, e
 const PERIODE = { dateDebut: '2026-01-05', dateFin: '2026-02-01', saison: 'hiver' as const }
 
 function genererAvec(vets: VetEngineNormalise[]) {
-  const input: SolverInput = { ...PERIODE, vets, bonusMalus: {}, lnsTimeoutMs: 0 }
+  const input: SolverInput = { ...PERIODE, vets, reportEquite: {}, lnsTimeoutMs: 0 }
   const result = genererPlanningPur(input)
   expect(result.success).toBe(true)
   return result.success ? result.planning : { attributions: [] }

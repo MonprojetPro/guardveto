@@ -263,7 +263,7 @@ describe('exclusion_dates — bout en bout (solve → validateur)', () => {
     // dateDebut est un LUNDI (2026-12-14) ; la période couvre 24 déc + 31 déc + 1er janv.
     const input = {
       dateDebut: '2026-12-14', dateFin: '2027-01-11', saison: 'hiver' as const,
-      vets, bonusMalus: {},
+      vets, reportEquite: {},
     }
     const res = genererPlanningPur(input)
     expect(res.success).toBe(true)

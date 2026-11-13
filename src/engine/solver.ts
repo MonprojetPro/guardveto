@@ -40,7 +40,8 @@ import { normaliserContraintesVets } from './normaliserContraintes'
 import { isValid } from './rules/hard-constraints'
 import { penalite } from './rules/soft-constraints'
 import { compterParVet, ecartMaxMin, type CompteurVet } from './rules/optimization'
-import { comparerScores, scorerPlanning, type VecteurScore, type BonusMalusMap } from './score-lexicographique'
+import { comparerScores, scorerPlanning, type VecteurScore } from './score-lexicographique'
+import { compteursEffectifs, type ReportEquiteMap } from './grand-livre-equite'
 import {
   DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, SEUILS_CRITIQUES_DEFAUT,
   type EquityWeights, type EquityDimension,
@@ -73,8 +74,14 @@ export interface SolverInput {
   dateFin: string
   saison: Saison
   vets: VetEngine[]
-  /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
-  bonusMalus: BonusMalusMap
+  /**
+   * Report d'équité inter-périodes (R20) — le grand livre (B-196, lot 0).
+   * `{}` si aucun : le moteur se comporte alors comme un cabinet sans
+   * historique. Construit par `construireReport` (grand-livre-equite.ts),
+   * qui cumule TOUTES les périodes de gardes closes, pas seulement la
+   * dernière, et sur les quatre dimensions, pas seulement les week-ends.
+   */
+  reportEquite: ReportEquiteMap
   /**
    * BACKSTOP temps optionnel pour la phase LNS, en ms.
    *
@@ -575,14 +582,15 @@ function facteurCritique(
  * Composantes :
  *  - Compteur dans la dimension principale du créneau × son poids
  *  - Pénalité souple (R10 : WE consécutifs)
- *  - Bonus/malus inter-périodes (R20) : réduit le compteur effectif
+ *  - Report d'équité inter-périodes (R20) : appliqué AUX COMPTEURS, en
+ *    amont, par `compteursEffectifs` — plus aucun calcul de report ici.
  *  - Anne-Cat (dernier recours) → score maximal = essayée en dernier
  */
 function scorerCandidat(
   step: SolverStep,
   vet: VetEngine,
   planning: PlanningPartiel,
-  bonusMalus: BonusMalusMap,
+  report: ReportEquiteMap,
   allVets: VetEngine[],
   weights: EquityWeights,
   calendrier?: CalendrierResolu,
@@ -611,8 +619,16 @@ function scorerCandidat(
   // dernier recours dans l'effectif et se contentent de le proposer en dernier.
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs =
-    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier)
+  // Le report d'équité est appliqué ICI, aux compteurs, et nulle part
+  // ailleurs : `facteurCritique` ci-dessous le voit donc lui aussi, ce
+  // qui est le but — un déséquilibre « critique » doit se mesurer sur la
+  // charge réelle, dette comprise. Report vide → même référence, donc
+  // aucun coût et comportement identique à l'historique.
+  const compteurs = compteursEffectifs(
+    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier),
+    report,
+    allVets,
+  )
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -623,7 +639,6 @@ function scorerCandidat(
     semaineRenfort: 0,
     grandsWePerdus: 0,
   }
-  const bm = bonusMalus[vet.id] ?? 0
   const pen = penalite(
     { date: step.date, type: step.type, saison: step.saison },
     vet,
@@ -659,9 +674,10 @@ function scorerCandidat(
   }
 
   if (step.type === 'weekend' || step.type === 'vendredi_soir') {
-    // R11 + R20 : équité WE — bonus/malus réduit le compteur effectif
-    // Si bm > 0 (véto doit plus de gardes), son score est réduit → essayé avant
-    const weEffectif = c.weGardes - bm
+    // R11 + R20 : équité WE. Le compteur porte DÉJÀ le report (voir
+    // `compteursEffectifs` plus haut) : un véto qui doit faire plus a un
+    // compteur plus bas, donc un score plus bas, donc il est essayé avant.
+    const weEffectif = c.weGardes
 
     // R11b : équité du rôle portant l'avantage financier (réglable — P4).
     // Défaut roleAvantageFinancier='premier' → byte-identique à l'historique
@@ -893,7 +909,7 @@ function resoudreGroupe(
   groupe: SolverStep[],
   planningInitial: PlanningPartiel,
   vets: VetEngineNormalise[],
-  bonusMalus: BonusMalusMap,
+  report: ReportEquiteMap,
   weights: EquityWeights,
   structure: StructureConfig,
   calendrier: CalendrierResolu | undefined,
@@ -941,7 +957,7 @@ function resoudreGroupe(
       .map((vet) => ({
         vet,
         score: scorerCandidat(
-          step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantage,
+          step, vet, planning, report, vets, weights, calendrier, roleAvantage,
           compteurs, structure.penalitesSouples, structure.historiqueFetes,
           compositionsSouples(structure), rolesInterditsSouples(structure), contexteAnterieur,
         ),
@@ -1014,7 +1030,7 @@ function raisonsCompletes(
  * (« si une règle ne peut pas être respectée, SIGNALER, ne jamais inventer »).
  */
 export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
-  const { dateDebut, dateFin, saison, bonusMalus, calendrier } = input
+  const { dateDebut, dateFin, saison, reportEquite: report, calendrier } = input
   const vets = normaliserContraintesVets(input.vets)
   const weights = input.equityWeights ?? DEFAULT_EQUITY_WEIGHTS
   const structure = input.structureConfig ?? DEFAULT_STRUCTURE_CONFIG
@@ -1042,7 +1058,7 @@ export function remplirAuMieux(input: SolverInput): RemplissageAuMieux {
     // est indexée dessus — on garde donc le groupe réordonné pour la relire.
     const groupe = prioriserCasesFigees(groupeBrut, figees)
     const choix = resoudreGroupe(
-      groupe, planning, vets, bonusMalus, weights, structure, calendrier,
+      groupe, planning, vets, report, weights, structure, calendrier,
       roleAvantage, input.contexteAnterieur,
     )
 
@@ -1214,7 +1230,7 @@ export function rattraperCasesVides(
         if (tempsEcoule()) { budgetEpuise = true; break }
 
         const essai = essayerDePourvoir(
-          step, candidat, planning, groupes, vets, input.bonusMalus, weights,
+          step, candidat, planning, groupes, vets, input.reportEquite, weights,
           structure, calendrier, roleAvantage, input.contexteAnterieur, figees,
         )
         if (!essai) continue
@@ -1483,7 +1499,7 @@ function essayerDePourvoir(
   planning: PlanningPartiel,
   groupes: SolverStep[][],
   vets: VetEngineNormalise[],
-  bonusMalus: BonusMalusMap,
+  report: ReportEquiteMap,
   weights: EquityWeights,
   structure: StructureConfig,
   calendrier: CalendrierResolu | undefined,
@@ -1535,7 +1551,7 @@ function essayerDePourvoir(
     if (restants.length === 0) continue
 
     const choix = resoudreGroupe(
-      restants, essai, vets, bonusMalus, weights, structure, calendrier,
+      restants, essai, vets, report, weights, structure, calendrier,
       roleAvantage, contexteAnterieur,
     )
     restants.forEach((step, i) => {
@@ -1619,7 +1635,7 @@ interface SeedBudget {
  * @param index     Index courant dans `steps`
  * @param planning  Planning partiellement construit (immuable)
  * @param vets      Tous les vétérinaires
- * @param bonusMalus  Bonus/malus inter-périodes
+ * @param report    Report d'équité inter-périodes (grand livre, B-196 lot 0)
  * @param deepest   Référence mutable : index le plus profond atteint (pour diagnostics)
  * @param blocage   Référence mutable : premier créneau réellement sans candidat
  *                  (avec son contexte partiel) — vrai point d'impasse (Lot 1)
@@ -1631,7 +1647,7 @@ function backtrack(
   index: number,
   planning: PlanningPartiel,
   vets: VetEngineNormalise[],
-  bonusMalus: BonusMalusMap,
+  report: ReportEquiteMap,
   weights: EquityWeights,
   structure: StructureConfig,
   deepest: { value: number },
@@ -1677,7 +1693,7 @@ function backtrack(
   const candidates = valides
     .map((vet) => ({
       vet,
-      score: scorerCandidat(step, vet, planning, bonusMalus, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep, rolesInterditsSouplesStep, contexteAnterieur),
+      score: scorerCandidat(step, vet, planning, report, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouplesStep, rolesInterditsSouplesStep, contexteAnterieur),
     }))
     .sort((a, b) => a.score - b.score)
     .map(({ vet }) => vet)
@@ -1695,7 +1711,7 @@ function backtrack(
   // Essaie chaque candidat dans l'ordre de priorité
   for (const vet of candidates) {
     const newPlanning = assignerStep(planning, step, vet.id)
-    const result = backtrack(steps, index + 1, newPlanning, vets, bonusMalus, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier, budget, contexteAnterieur)
+    const result = backtrack(steps, index + 1, newPlanning, vets, report, weights, structure, deepest, blocage, calendrier, roleAvantageFinancier, budget, contexteAnterieur)
     if (result !== null) return result
     // Budget épuisé pendant la descente → on arrête d'essayer d'autres candidats.
     if (budget.depasse) return null
@@ -1717,7 +1733,7 @@ function backtrack(
  *   coûteuse (un seul niveau de re-sim, seed greedy uniquement).
  */
 function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResult {
-  const { dateDebut, dateFin, saison, bonusMalus, calendrier } = input
+  const { dateDebut, dateFin, saison, reportEquite: report, calendrier } = input
   // Normalisation à l'entrée (idempotente) : les vétos passés à isValid DOIVENT
   // être normalisés (type VetEngineNormalise) — parade contre la cécité params.
   const vets = normaliserContraintesVets(input.vets)
@@ -1763,7 +1779,7 @@ function genererSeedGreedy(input: SolverInput, avecDiagnostic = true): SolveResu
     0,
     planningDepart,
     vets,
-    bonusMalus,
+    report,
     weights,
     structure,
     deepest,
@@ -1922,7 +1938,15 @@ function genererStepsSemaine(
 }
 
 /**
- * Scoring LNS — indépendant du bonusMalus (optim intra-période).
+ * Scoring de la phase d'AMÉLIORATION (LNS).
+ *
+ * ⚠️ Ce scoreur a ignoré le report d'équité inter-périodes jusqu'au
+ * 2026-11-13 (B-196, lot 0) — il était documenté « indépendant du
+ * bonusMalus (optim intra-période) ». Conséquence : le rattrapage posé
+ * au premier jet pouvait être DÉFAIT ici, en silence, parce que la
+ * phase d'amélioration jugeait l'équité sur la seule période en cours.
+ * Il reçoit maintenant le même report, appliqué par la même fonction.
+ *
  * Poids d'équité passés en paramètre (curseurs cabinet) — mêmes poids que le
  * scoreur global via equity-weights.ts (source unique, repli DEFAULT).
  */
@@ -1948,13 +1972,20 @@ export function scorerCandidatLNS(
   rolesInterdits?: RoleInterditTagRegle[],
   // #17 — lookback inter-périodes. Absent/vide → 0 (byte-identique — crise inchangée).
   contexteAnterieur?: AttributionGarde[],
+  // B-196 lot 0 — report d'équité inter-périodes. Absent/vide → comportement
+  // d'avant. La CRISE ne le passe pas, et c'est voulu : remplacer quelqu'un
+  // au pied levé n'est pas le moment de rembourser l'histoire.
+  report: ReportEquiteMap = {},
 ): number {
   // Cf. `scorerCandidat` : inopérant en génération depuis B-046 (l'effectif y
   // est filtré en amont), toujours actif sur les chemins de dépannage.
   if (vet.dernier_recours) return 1_000_000
 
-  const compteurs =
-    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier)
+  const compteurs = compteursEffectifs(
+    compteursPrecalcules ?? compterParVet(planning, allVets, roleAvantageFinancier, calendrier),
+    report,
+    allVets,
+  )
   const c = compteurs.find((x) => x.vetId === vet.id) ?? {
     vetId: vet.id,
     weGardes: 0,
@@ -2021,6 +2052,9 @@ function repairerSemaine(
   roleAvantageFinancier: string | null,
   // #17 — lookback inter-périodes (mêmes règles de rythme qu'à la construction).
   contexteAnterieur?: AttributionGarde[],
+  // B-196 lot 0 — le report d'équité, pour que la réparation d'une semaine
+  // ne défasse pas le rattrapage posé au premier jet.
+  report: ReportEquiteMap = {},
 ): PlanningPartiel | null {
   let planning = partialPlanning
 
@@ -2037,7 +2071,7 @@ function repairerSemaine(
     const sorted = valids
       .map((v) => ({
         v,
-        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure), rolesInterditsSouples(structure), contexteAnterieur),
+        score: scorerCandidatLNS(step, v, planning, vets, weights, calendrier, roleAvantageFinancier, compteursStep, structure.penalitesSouples, structure.historiqueFetes, compositionsSouples(structure), rolesInterditsSouples(structure), contexteAnterieur, report),
       }))
       .sort((a, b) => a.score - b.score)
       .map(({ v }) => v)
@@ -2135,6 +2169,11 @@ function lnsHillClimbing(
     ? DEFAULT_ROLE_AVANTAGE_FINANCIER
     : input.roleAvantageFinancier
   const contexteAnterieur = input.contexteAnterieur
+  // B-196 lot 0 — le report d'équité suit jusqu'ici. C'est LE point qui
+  // manquait : sans lui, la phase d'amélioration reconstruisait des
+  // semaines entières en jugeant l'équité sur la seule période en cours,
+  // et pouvait défaire le rattrapage que le premier jet venait de poser.
+  const report = input.reportEquite
   // B-111 — les places cadenassées, que la destroy-repair ne doit jamais perdre.
   const figees = indexerFigees(input.placesFigees)
   // Backstop temps : actif UNIQUEMENT si fourni > 0. Sinon, aucune coupe chrono
@@ -2150,7 +2189,7 @@ function lnsHillClimbing(
   const maxPassesSansAmelioration = 3
 
   let meilleur = seedPlanning
-  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur)
+  let scoreMeilleur = scorerPlanning(meilleur, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur, report)
 
   const lundis = extraireLundis(dateDebut, dateFin)
 
@@ -2195,11 +2234,13 @@ function lnsHillClimbing(
       if (steps.length === 0) continue
 
       // Réparer : greedy LNS sur la semaine
-      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier, roleAvantage, contexteAnterieur)
+      const repaired = repairerSemaine(partial, steps, vets, weights, structure, calendrier, roleAvantage, contexteAnterieur, report)
       if (repaired === null) continue
 
-      // Comparer : garder si strictement amélioré
-      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur)
+      // Comparer : garder si strictement amélioré. Le score final connaît
+      // maintenant le report : une amélioration qui creuserait la dette
+      // d'un véto est REFUSÉE, là où elle passait silencieusement.
+      const scoreNew = scorerPlanning(repaired, vets, saison, weights, structure, roleAvantage, calendrier, contexteAnterieur, report)
       if (comparerScores(scoreNew, scoreMeilleur) < 0) {
         meilleur = repaired
         scoreMeilleur = scoreNew

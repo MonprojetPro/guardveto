@@ -29,6 +29,8 @@ import {
   type CompteursRow,
 } from '@/hooks/useCompteurs'
 import { calculerBilans, type BilanVet } from '@/engine/bilan'
+import { chargerGrandLivrePourAffichage } from '@/data/grandLivreEquite'
+import { effectifPourGeneration } from '@/engine/effectif'
 import { revaliderPlanning } from '@/data/revaliderPlanning'
 import { setEquiteImportance } from '@/app/(protected)/regles/actions'
 import {
@@ -68,6 +70,22 @@ async function chargerVets(ctx: ContexteOutil): Promise<VetoMini[]> {
     await ctx.supabase.from('veterinaires').select('id, prenom, nom'),
     "la liste de l'équipe",
   )
+}
+
+/**
+ * Les vétérinaires qui comptent pour l'équité inter-périodes (B-196 lot 0).
+ *
+ * MÊME périmètre qu'à la génération (`effectifPourGeneration`) : le dernier
+ * recours en est exclu. Sans cette exclusion, Filou annoncerait un
+ * rattrapage à quelqu'un que le moteur n'appelle jamais — au Val d'Allier,
+ * Anne-Catherine traîne -12 gardes de semaine, qu'elle ne rattrapera pas.
+ */
+async function idsEffectifEquite(ctx: ContexteOutil): Promise<string[]> {
+  const vets = lignesLues<{ id: string; dernier_recours: boolean }>(
+    await ctx.supabase.from('veterinaires').select('id, dernier_recours').eq('actif', true),
+    "l'effectif pour l'équité",
+  )
+  return effectifPourGeneration(vets).map((v) => v.id)
 }
 
 /** Résout un prénom en véto. Refuse l'à-peu-près, comme `equipe.ts`. */
@@ -323,18 +341,74 @@ Si aucune garde n'a encore été générée pour la période demandée, l'outil 
         : []
     const officielDe = (id: string) => officiel.find((o) => o.veterinaire_id === id)
 
+    // B-196 lot 0 — LE GRAND LIVRE, lu par la MÊME fonction que le moteur et
+    // que l'écran Historique.
+    //
+    // ⚠️ Sans lui, Filou racontait l'équité de la période en cours et rien
+    // d'autre. À « Victor n'a-t-il pas trop de week-ends ? », il répondait
+    // sur les seuls week-ends de la période — alors que Victor en traîne
+    // trois de trop depuis trois périodes. Une réponse incomplète présentée
+    // comme complète : exactement ce que la règle FILOU SUIT LE PRODUIT
+    // interdit. Le périmètre est celui du moteur (dernier recours exclu).
+    const grandLivre = await chargerGrandLivrePourAffichage(
+      ctx.supabase,
+      periode.date_debut,
+      await idsEffectifEquite(ctx),
+      // Isolation EXPLICITE : le contexte de Filou porte déjà le cabinet, et
+      // s'appuyer sur la seule RLS reviendrait à parier que ce chemin ne
+      // tournera jamais sous une clé de service. Un cumul tous cabinets
+      // confondus ne se verrait nulle part dans la réponse.
+      ctx.cabinetId,
+    )
+    const cumulDe = (id: string) => grandLivre.cumul[id]
+    const reportDe = (id: string) => grandLivre.report[id]
+
     return {
       periode: periodeLabelCourt(periode),
       statut: LIBELLE_STATUT[periode.statut],
       nombre_week_ends_dans_la_periode: totalWE,
+      // B-196 lot 0 — dit en toutes lettres ce que couvrent les écarts
+      // ci-dessous. Sans cette phrase, « l'écart » se lit comme l'écart
+      // tout court, alors qu'il ne porte que sur CETTE période ; le cumul
+      // de toutes les précédentes est le champ `equite_cumulee`.
+      note_sur_les_ecarts: grandLivre.erreur
+        ? "ATTENTION : je n'ai pas pu lire l'historique des périodes passées. Les écarts ci-dessous ne portent QUE sur cette période. Ne dis pas que l'équipe est à jour : dis que tu n'as pas pu le vérifier."
+        : grandLivre.nbPeriodes > 0
+          ? `Les écarts « ecart » ci-dessous ne portent QUE sur cette période. Ce que chacun traîne depuis le début (${grandLivre.nbPeriodes} période(s) close(s)) est dans « equite_cumulee », et c'est ce chiffre-là que le moteur rattrape.`
+          : "Aucune période close avant celle-ci : il n'y a encore rien à rattraper.",
       vetos: lignes.map((c) => {
         const b = bilanDe(c.veterinaire_id)
         const off = officielDe(c.veterinaire_id)
+        const cumul = cumulDe(c.veterinaire_id)
+        const report = reportDe(c.veterinaire_id)
         return {
           prenom: c.prenom,
           nom: c.nom,
           statut: c.statut,
           gardes_total: c.total_gardes,
+          // ⚠️ L'ordre des cas compte : une erreur de lecture ne doit JAMAIS
+          // ressortir en « aucun historique », qui se lit comme une bonne
+          // nouvelle. Filou doit dire qu'il n'a pas pu regarder.
+          equite_cumulee: grandLivre.erreur
+            ? "je n'ai pas pu lire l'historique des périodes passées — impossible de dire ce que cette personne traîne"
+            : cumul
+            ? {
+                note:
+                  "Cumul des périodes closes AVANT celle-ci — la dette réelle, celle que le moteur regarde. Si on te parle d'une période ancienne, ce chiffre est celui qui valait À CE MOMENT-LÀ, pas aujourd'hui.",
+                week_ends: interpreterEcart(cumul.we, 'week-end(s)'),
+                semaine: interpreterEcart(cumul.semaine, 'garde(s) de semaine'),
+                feries: interpreterEcart(cumul.feries, 'garde(s) de férié'),
+                rattrapage_sur_cette_periode: report
+                  ? {
+                      note:
+                        "Ce que le moteur rattrape SUR CETTE PÉRIODE — appliqué si elle est déjà générée, à appliquer sinon. Volontairement étalé : au plus 1 week-end, 1 férié et 2 gardes de semaine par période ; le reste suit aux périodes d'après.",
+                      week_ends: report.we,
+                      semaine: report.semaine,
+                      feries: report.feries,
+                    }
+                  : "rien à rattraper, ou vétérinaire hors de la rotation (dernier recours)",
+              }
+            : "aucun historique : ce vétérinaire démarre à zéro",
           week_ends: {
             en_premier: c.we_premier,
             en_second: c.we_second,

@@ -179,7 +179,7 @@ describe('REPRO — duo_interdit Antoine + Manon (binôme WE)', () => {
       dateFin: '2026-09-27',
       saison: 'ete',
       vets: ALL_VETS,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 1_000,
     }
 
@@ -203,7 +203,7 @@ describe('REPRO — duo_interdit Antoine + Manon (binôme WE)', () => {
       dateFin: '2026-03-29',
       saison: 'hiver',
       vets: ALL_VETS,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 1_000,
     }
 

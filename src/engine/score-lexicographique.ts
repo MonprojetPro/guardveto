@@ -15,15 +15,7 @@
 import type { PlanningPartiel, VetEngine, VetEngineNormalise, SlotGarde, RoleGarde, CalendrierResolu, AttributionGarde } from './types'
 import { attributionsAvecContexte } from './utils'
 
-// ── Type partagé solver ↔ loader ─────────────────────────
-/**
- * Bonus/malus inter-périodes par vétérinaire (R20).
- * - Valeur positive : le véto doit faire PLUS de gardes cette période.
- * - Valeur négative : le véto doit faire MOINS de gardes cette période.
- */
-export interface BonusMalusMap {
-  [vetId: string]: number
-}
+import { compteursEffectifs, type ReportEquiteMap } from './grand-livre-equite'
 import { isValid } from './rules/hard-constraints'
 import {
   DEFAULT_EQUITY_WEIGHTS, DEFAULT_ROLE_AVANTAGE_FINANCIER, DIMENSION_TO_COMPTEUR,
@@ -261,6 +253,24 @@ export function scorerPlanning(
   // Étend la vue des SEULES règles de rythme (R10, + étage 0 via isValid) —
   // JAMAIS l'équité (étage 6) ni la couverture, qui ne comptent pas le lookback.
   contexteAnterieur?: AttributionGarde[],
+  /**
+   * B-196 lot 0 — REPORT D'ÉQUITÉ INTER-PÉRIODES. Absent/vide →
+   * byte-identique à l'historique.
+   *
+   * ⚠️ C'est ici que se jouait le défaut le plus coûteux du chantier :
+   * ce scoreur est celui qui ACCEPTE ou REFUSE chaque amélioration du
+   * moteur, et il ne connaissait PAS le report. Le rattrapage posé au
+   * premier jet pouvait donc être défait juste après, sans alarme —
+   * « 0 occurrence de bonusMalus dans ce fichier », constat de la
+   * confrontation du 2026-11-10.
+   *
+   * Contrairement au `contexteAnterieur` ci-dessus, qui n'étend QUE les
+   * règles de rythme, le report touche VOLONTAIREMENT l'équité : c'est
+   * tout son objet. Il s'applique aux deux étages qui la mesurent
+   * (EQUITE_CRITIQUE et EQUITE), via la même `compteursEffectifs` que
+   * les deux scoreurs de candidat — une seule source, pas trois vues.
+   */
+  report: ReportEquiteMap = {},
 ): VecteurScore {
   const v = vecteurVide()
   const slotRoles = listerSlotRoles(planning, saison)
@@ -485,7 +495,16 @@ export function scorerPlanning(
     ajouter(v, contrib.etage, 'seulement-avec-souple', contrib.cout)
   }
 
-  const compteurs = compterParVet(planning, vets, roleAvantageFinancier, calendrier)
+  // Les compteurs de la période, REPORT COMPRIS (B-196 lot 0). Les deux
+  // étages d'équité ci-dessous jugent donc la charge réelle de chacun —
+  // celle de la période plus ce qu'il traîne des précédentes — et non
+  // plus la seule photo de la période en cours. Report vide → même
+  // référence, donc score strictement identique à l'historique.
+  const compteurs = compteursEffectifs(
+    compterParVet(planning, vets, roleAvantageFinancier, calendrier),
+    report,
+    vets,
+  )
 
   // ── Étage EQUITE_CRITIQUE : les déséquilibres que l'équipe remarquerait ──
   // Ne se déclenche qu'AU-DELÀ du seuil de la dimension. En dessous : aucune

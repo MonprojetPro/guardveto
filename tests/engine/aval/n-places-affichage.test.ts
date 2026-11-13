@@ -52,7 +52,7 @@ const solverInput: SolverInput = {
   dateFin: '2026-01-11',
   saison: 'hiver',
   vets,
-  bonusMalus: {},
+  reportEquite: {},
   creneaux: [creneauWE4],
 }
 

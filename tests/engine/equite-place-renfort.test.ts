@@ -122,7 +122,7 @@ describe('Sur un vrai planning à 3 places, les renforts sont RÉPARTIS', () => 
       dateFin: '2026-07-31', // 4 semaines : assez pour que l'équité ait prise
       saison: 'ete',
       vets,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       creneaux: catalogue(3),
       nbVetosSemaineSoir: 3,

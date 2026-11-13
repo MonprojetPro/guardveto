@@ -240,7 +240,7 @@ function ecartSecondsApresGeneration(seuils?: typeof SEUILS_DESACTIVES): number 
   const vets = normaliserContraintesVets(vetsAvecUnQuiDecroche())
   const r = genererPlanningPur({
     dateDebut: '2025-11-03', dateFin: '2025-12-28', saison: 'hiver',
-    vets, bonusMalus: {}, lnsTimeoutMs: 4000,
+    vets, reportEquite: {}, lnsTimeoutMs: 4000,
     equityWeights: { ...DEFAULT_EQUITY_WEIGHTS, ...(seuils ? { seuilsCritiques: seuils } : {}) },
   })
   if (!r.success) throw new Error('génération échouée — le montage du test est cassé')

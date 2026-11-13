@@ -161,7 +161,10 @@ export async function resoudreContexte(
     exclusDernierRecours: options?.pourGeneration
       ? exclusDeLaGeneration(input.vets).map((v) => ({ id: v.id, prenom: v.prenom }))
       : undefined,
-    bonusMalus: input.bonusMalus,
+    // B-196 lot 0 — le report d'équité, propagation EXPLICITE comme le
+    // lookback ci-dessous : cet objet est reconstruit champ par champ, et
+    // un champ oublié ici est détruit en silence avant le solver.
+    reportEquite: input.reportEquite,
     calendrier,
     nbVetosSemaineSoir: input.nbVetosSemaineSoir,
     equityWeights: input.equityWeights,

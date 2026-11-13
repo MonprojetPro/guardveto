@@ -239,7 +239,7 @@ describe('bout-en-bout — meme_binome sur deux créneaux sur-mesure (mar → me
   // La DONNÉE : couple historique CONSERVÉ + relation custom mar→mer.
   const input: SolverInput = {
     dateDebut: '2026-01-05', dateFin: '2026-02-01', saison: 'hiver',
-    vets, bonusMalus: {}, creneaux: catalogue,
+    vets, reportEquite: {}, creneaux: catalogue,
     structureConfig: {
       r9_liaison: ferme,
       r8_inversion: ferme,

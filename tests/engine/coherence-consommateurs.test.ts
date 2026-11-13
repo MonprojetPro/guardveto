@@ -84,7 +84,7 @@ describe('Cohérence inter-consommateurs — règle rangée sous params (Fanny r
   it('le générateur n’assigne jamais Fanny le mercredi (et le validateur le confirme)', () => {
     const input: SolverInput = {
       dateDebut: LUNDI, dateFin: '2026-01-11', saison: 'hiver',
-      vets: TOUS, bonusMalus: {}, nbVetosSemaineSoir: 1,
+      vets: TOUS, reportEquite: {}, nbVetosSemaineSoir: 1,
     }
     const res = genererPlanningPur(input)
     expect(res.success).toBe(true)

@@ -46,7 +46,7 @@ describe('Effectif configurable — R17/R18 pilotés par besoinSecond', () => {
 describe('Effectif configurable — génération de bout en bout', () => {
   const vets = ['a', 'b', 'c', 'd', 'e'].map(vet)
   // Une semaine (lundi 2026-07-06 → dimanche 2026-07-12).
-  const base = { dateDebut: '2026-07-06', dateFin: '2026-07-12', vets, bonusMalus: {}, lnsTimeoutMs: 0 }
+  const base = { dateDebut: '2026-07-06', dateFin: '2026-07-12', vets, reportEquite: {}, lnsTimeoutMs: 0 }
 
   it('hiver nbVetosSemaineSoir=1 → aucune nuit de semaine n\'a de 2nd', () => {
     const res = genererPlanningPur({ ...base, saison: 'hiver', nbVetosSemaineSoir: 1 })

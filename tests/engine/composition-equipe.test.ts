@@ -64,7 +64,7 @@ describe('composition_equipe — moteur (règles dures)', () => {
     const input: SolverInput = {
       ...PERIODE,
       vets: EQUIPE,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(
         regle({ mode: 'au_moins_un', tag: 'senior', creneaux: ['weekend'] }),
@@ -86,7 +86,7 @@ describe('composition_equipe — moteur (règles dures)', () => {
     const input: SolverInput = {
       ...PERIODE,
       vets: EQUIPE,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(regle({ mode: 'pas_seuls', tag: 'junior' })),
     }
@@ -106,7 +106,7 @@ describe('composition_equipe — moteur (règles dures)', () => {
     const input: SolverInput = {
       dateDebut: '2026-07-06', dateFin: '2026-08-02', saison: 'ete',
       vets: EQUIPE,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(regle({ mode: 'pas_seuls', tag: 'junior', creneaux: ['semaine_soir'] })),
     }
@@ -128,7 +128,7 @@ describe('composition_equipe — moteur (règles dures)', () => {
     const input: SolverInput = {
       ...PERIODE,
       vets: queDesJuniors,
-      bonusMalus: {},
+      reportEquite: {},
       lnsTimeoutMs: 0,
       structureConfig: structureAvec(
         regle({ mode: 'au_moins_un', tag: 'senior', etage: 4 }),
@@ -192,7 +192,7 @@ describe('composition_equipe — validateur indépendant', () => {
       regle({ mode: 'pas_seuls', tag: 'junior' }),
     )
     const result = genererPlanningPur({
-      ...PERIODE, vets: EQUIPE, bonusMalus: {}, lnsTimeoutMs: 0, structureConfig,
+      ...PERIODE, vets: EQUIPE, reportEquite: {}, lnsTimeoutMs: 0, structureConfig,
     })
     expect(result.success).toBe(true)
     if (!result.success) return

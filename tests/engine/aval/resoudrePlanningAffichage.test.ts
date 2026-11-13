@@ -112,7 +112,7 @@ describe('contre-preuve V2 — le vendredi reconstruit matche le vendredi du mot
   }))
   const input: SolverInput = {
     dateDebut: '2026-01-05', dateFin: '2026-02-15', saison: 'hiver',
-    vets, bonusMalus: {},
+    vets, reportEquite: {},
   }
   const res = genererPlanningPur(input)
 

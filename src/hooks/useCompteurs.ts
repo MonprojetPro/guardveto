@@ -597,27 +597,11 @@ export async function queryHistoriqueFetes(
   })
 }
 
-/**
- * Charge le bonus/malus hérité depuis la période précédente.
- * Retourne null si aucun enregistrement trouvé.
- */
-export async function queryBonusMalusHeritage(
-  supabase: SupabaseClient,
-  periodeSelectionnee: Periode,
-  toutesLesPeriodes: Periode[]
-): Promise<BonusMalusRow[]> {
-  // Trouver la période chronologiquement précédente
-  const periodesPrecedentes = toutesLesPeriodes
-    .filter((p) => p.date_fin < periodeSelectionnee.date_debut)
-    .sort((a, b) => b.date_debut.localeCompare(a.date_debut))
-
-  const periodePrecedente = periodesPrecedentes[0]
-  if (!periodePrecedente) return []
-
-  const { data } = await supabase
-    .from('bonus_malus')
-    .select('veterinaire_id, ecart_we, ecart_semaine, ecart_feries, ecart_grands_we')
-    .eq('periode_id', periodePrecedente.id)
-
-  return (data as BonusMalusRow[] | null) ?? []
-}
+// ── queryBonusMalusHeritage : RETIRÉE le 2026-11-13 (B-196, lot 0) ──
+//
+// Elle lisait les écarts de la SEULE période précédente, et l'écran
+// Historique les affichait sous le titre « Report du tour d'avant ». Le
+// moteur cumule désormais TOUTES les périodes de gardes closes : garder
+// cette lecture aurait laissé l'écran annoncer un chiffre que le moteur
+// n'utilise plus. Son remplaçant, partagé avec le moteur et avec Filou :
+// `chargerGrandLivre` (`src/data/grandLivreEquite.ts`).

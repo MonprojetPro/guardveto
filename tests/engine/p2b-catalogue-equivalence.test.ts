@@ -58,7 +58,7 @@ function buildInput(scenario: ScenarioMin, creneaux?: CreneauModele[]): SolverIn
     dateFin: scenario.periode.dateFin,
     saison,
     vets: scenario.vets as unknown as VetEngine[],
-    bonusMalus: scenario.bonusMalus ?? {},
+    reportEquite: {},
     creneaux,
     // L'effectif de nuit, posé à l'identique des deux côtés — c'est l'ancien
     // repli saison, écrit noir sur blanc au lieu d'être supposé partagé.

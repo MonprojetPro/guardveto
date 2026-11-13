@@ -60,7 +60,7 @@ function makeInput(vets: VetEngine[], lnsTimeoutMs = 2000): SolverInput {
     dateFin: DATE_FIN,
     saison: 'hiver',
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     lnsTimeoutMs, // timeout court pour les tests
   }
 }

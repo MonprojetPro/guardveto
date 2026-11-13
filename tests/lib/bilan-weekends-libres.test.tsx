@@ -17,7 +17,9 @@ function rendre(vets: { id: string; statut: string }[], grands: Record<string, n
       periodeId="p"
       periodeStatut="publie"
       existingBilan={vets.map((v) => bilan(v.id, grands[v.id] ?? 0)) as never}
-      heritage={[]}
+      // B-196 lot 0 — grand livre vide : ces cas ne portent sur aucun
+      // historique, la colonne de rattrapage ne doit donc pas s'afficher.
+      grandLivre={{ cumul: {}, report: {}, nbPeriodes: 0 }}
       vetsInfo={vets.map((v) => ({ id: v.id, prenom: v.id, nom: '', couleur: '#888888', statut: v.statut }))}
     />,
   )

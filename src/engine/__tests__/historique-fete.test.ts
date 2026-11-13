@@ -52,7 +52,7 @@ function makeInput(structureConfig?: StructureConfig): SolverInput {
     dateFin: '2027-01-03',   // dimanche
     saison: 'ete',           // 1 véto les soirs de semaine (scénario léger)
     vets: VETS.map((v) => ({ ...v })),
-    bonusMalus: {},
+    reportEquite: {},
     calendrier: {
       feries: new Set(['2026-12-25', '2027-01-01']),
       vacancesScolaires: [{ debut: '2026-12-19', fin: '2027-01-03' }],

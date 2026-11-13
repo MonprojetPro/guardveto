@@ -72,7 +72,7 @@ function solverInput(scenario: ScenarioMin): SolverInput {
     dateFin: scenario.periode.dateFin,
     saison: scenario.periode.saison as 'hiver' | 'ete',
     vets: scenario.vets as unknown as VetEngine[],
-    bonusMalus: scenario.bonusMalus ?? {},
+    reportEquite: {},
     nbVetosSemaineSoir: effectifDe(scenario),
   }
 }

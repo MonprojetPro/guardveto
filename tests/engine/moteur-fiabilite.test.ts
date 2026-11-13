@@ -245,7 +245,7 @@ function construireScenario(i: number): { input: SolverInput; opts: OptionsScena
     dateFin,
     saison,
     vets,
-    bonusMalus: {},
+    reportEquite: {},
     lnsTimeoutMs: 2000, // budget LNS court pour garder le run rapide
     calendrier: CAL_PARTAGE, // référentiel calendaire identique des deux côtés
   }
@@ -286,7 +286,7 @@ function casLimites(): Array<{ input: SolverInput; label: string }> {
     cas.push({
       input: {
         dateDebut: '2026-09-07', dateFin: plusJours('2026-09-07', 6 * 7 - 1),
-        saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
+        saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
       },
       label: 'cas-limite multi-duos interdits (formats mixtes)',
     })
@@ -306,7 +306,7 @@ function casLimites(): Array<{ input: SolverInput; label: string }> {
     cas.push({
       input: {
         dateDebut: '2026-09-07', dateFin: plusJours('2026-09-07', 4 * 7 - 1),
-        saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
+        saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
       },
       label: 'cas-limite dernier recours quasi forcé',
     })
@@ -325,7 +325,7 @@ function casLimites(): Array<{ input: SolverInput; label: string }> {
     cas.push({
       input: {
         dateDebut: '2026-09-07', dateFin: plusJours('2026-09-07', 5 * 7 - 1),
-        saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
+        saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 2000, calendrier: CAL_PARTAGE,
       },
       label: 'cas-limite congés lourds',
     })
@@ -345,7 +345,7 @@ function casLimites(): Array<{ input: SolverInput; label: string }> {
     cas.push({
       input: {
         dateDebut: '2026-12-07', dateFin: plusJours('2026-12-07', 6 * 7 - 1),
-        saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 2000,
+        saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 2000,
         calendrier: { feries: new Set(), vacancesScolaires: [{ debut: '2026-12-19', fin: '2027-01-04' }] },
       },
       label: 'cas-limite parité ancrée à cheval sur semaine ISO 53',
@@ -362,7 +362,7 @@ function casLimites(): Array<{ input: SolverInput; label: string }> {
     cas.push({
       input: {
         dateDebut: '2026-09-07', dateFin: '2026-09-13',
-        saison: 'hiver', vets, bonusMalus: {}, lnsTimeoutMs: 1000, calendrier: CAL_PARTAGE,
+        saison: 'hiver', vets, reportEquite: {}, lnsTimeoutMs: 1000, calendrier: CAL_PARTAGE,
       },
       label: 'cas-limite LÉGITIMEMENT infaisable (1 véto, WE exige 2)',
     })

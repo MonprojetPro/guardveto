@@ -69,13 +69,21 @@ function makeBuilder(table: string) {
   builder.neq = chain // B-111 — lecture des places cadenassées (`neq('places_figees','{}')`)
   builder.lt = chain
   builder.or = chain
+  builder.in = chain // B-196 — lecture des bilans des périodes antérieures
   builder.order = chain
   builder.limit = chain
   builder.single = () => Promise.resolve({ data: dataFor(table), error: null })
   builder.maybeSingle = () => Promise.resolve({ data: null, error: null }) // pas de période précédente
   // Thenable : permet `await supabase.from(t).select()...` sans terminateur.
+  //
+  // ⚠️ `periodes` est la SEULE table lue des deux façons : `.single()` pour
+  // la période à générer (un objet), et sans terminateur pour la LISTE des
+  // périodes antérieures du grand livre d'équité (B-196 lot 0 — un
+  // tableau). Sans cette distinction, le loader recevait ici l'objet de la
+  // période courante et plantait sur `.map` — ce que ces tests ont
+  // justement attrapé.
   builder.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
-    resolve({ data: dataFor(table), error: null })
+    resolve({ data: table === 'periodes' ? [] : dataFor(table), error: null })
 
   return builder
 }

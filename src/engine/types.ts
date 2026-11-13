@@ -238,8 +238,8 @@ export interface ContexteSimulation {
    * parmi ses règles.
    */
   exclusDernierRecours?: { id: string; prenom: string }[]
-  /** Bonus/malus inter-périodes (R20). Passer {} si aucun. */
-  bonusMalus: import('./score-lexicographique').BonusMalusMap
+  /** Report d'équité inter-périodes (R20 — grand livre, B-196 lot 0). `{}` si aucun. */
+  reportEquite: import('./grand-livre-equite').ReportEquiteMap
   /** Calendrier résolu (fériés + vacances scolaires). Fallback sur listes en dur si absent. */
   calendrier?: CalendrierResolu
   /**

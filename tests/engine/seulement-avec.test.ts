@@ -290,7 +290,7 @@ describe('seulement_avec — bout en bout (solve → validateur)', () => {
     ])
     const input = {
       dateDebut: '2026-11-02', dateFin: '2026-11-29', saison: 'hiver' as const,
-      vets, bonusMalus: {},
+      vets, reportEquite: {},
     }
     const res = genererPlanningPur(input)
     expect(res.success).toBe(true)

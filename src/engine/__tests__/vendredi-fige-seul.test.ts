@@ -32,7 +32,7 @@ const EQUIPE = () => [
 function input(placesFigees: SolverInput['placesFigees']): SolverInput {
   return {
     dateDebut: '2025-11-03', dateFin: '2025-11-28', saison: 'hiver',
-    vets: EQUIPE(), bonusMalus: {}, lnsTimeoutMs: 2000, placesFigees,
+    vets: EQUIPE(), reportEquite: {}, lnsTimeoutMs: 2000, placesFigees,
   }
 }
 

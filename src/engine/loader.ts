@@ -8,7 +8,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { lirePerimetre } from '@/lib/absences/perimetre'
 import type { VetEngine, ContrainteEngine, CongeEngine, CalendrierResolu, AttributionGarde } from './types'
-import type { BonusMalusMap } from './score-lexicographique'
+import { chargerGrandLivre, chargerReportDAvant } from '@/data/grandLivreEquite'
+import { chantierOuvert } from '@/lib/produit/chantiers'
+import { cabinetEstBacASable } from '@/lib/produit/chantiers-serveur'
+import { effectifPourGeneration } from './effectif'
 import type { SolverInput } from './solver'
 import {
   gardesVersPlanningPartiel, moinsJours, type GardeRow,
@@ -252,7 +255,17 @@ async function chargerReglesCabinet(
 export async function chargerInputDepuisSupabase(
   periodeId: string,
   cabinetId?: string,
-  options?: { autoriserVerrouille?: boolean }
+  options?: {
+    autoriserVerrouille?: boolean
+    /**
+     * B-196 lot 0 — ce chargement sert-il à GÉNÉRER un planning ?
+     *
+     * Décisif pour le report d'équité : lui seul décide si une erreur de
+     * lecture de l'historique doit interrompre. Transmis tel quel par
+     * `resoudreContexte`, qui porte déjà ce drapeau pour l'effectif.
+     */
+    pourGeneration?: boolean
+  }
 ): Promise<SolverInput> {
   const supabase = await createClient()
 
@@ -315,28 +328,66 @@ export async function chargerInputDepuisSupabase(
     .lte('date_debut', periode.date_fin)
     .gte('date_fin', periode.date_debut)
 
-  // 4. Bonus/malus de la période précédente (pour R20)
-  const { data: periodePrecedente } = await supabase
-    .from('periodes')
-    .select('id')
-    .lt('date_fin', periode.date_debut)
-    .order('date_fin', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // 4. LE GRAND LIVRE D'ÉQUITÉ (R20 — B-196, lot 0)
+  //
+  // ⚠️ CE QUE CE BLOC FAISAIT JUSQU'AU 2026-11-13, ET QUI NE TENAIT PAS :
+  // il lisait `ecart_we` — UNE colonne sur quatre — de la SEULE période
+  // précédente. Les écarts de semaine et de fériés étaient écrits en base
+  // par quatre chemins et relus par personne ; une dette de trois périodes
+  // était ramenée à celle de la dernière. Mesuré au Val d'Allier : Victor
+  // +3 week-ends en cumul, le moteur n'en voyait qu'un ; Antoine +5 gardes
+  // de semaine, le moteur n'en voyait aucune.
+  //
+  // Maintenant : TOUTES les périodes de gardes closes, TOUTES les
+  // dimensions mesurées, cumulées puis plafonnées — par la MÊME fonction
+  // que l'écran Historique et que Filou (`data/grandLivreEquite`), pour
+  // qu'aucun des trois ne puisse plus annoncer un autre chiffre.
+  //
+  // Le périmètre du report = l'EFFECTIF, dernier recours exclu.
+  // Anne-Catherine porte -12 gardes de semaine en cumul au Val d'Allier :
+  // entrée ici, elle réclamerait un rattrapage massif alors qu'elle n'est
+  // jamais candidate, et tirerait seule la variance du score final.
+  const idsEffectif = effectifPourGeneration(
+    ((vetsDb as { id: string; dernier_recours: boolean }[] | null) ?? []),
+  ).map((v) => v.id)
 
-  let bonusMalus: BonusMalusMap = {}
-  if (periodePrecedente) {
-    const { data: bmDb } = await supabase
-      .from('bonus_malus')
-      .select('veterinaire_id, ecart_we')
-      .eq('periode_id', periodePrecedente.id)
+  // ⚠️ PORTE DE CHANTIER (B-151) — le grand livre change le COMPORTEMENT du
+  // moteur, pas un dessin. Il ne part donc qu'aux bacs à sable tant que MiKL
+  // n'a pas recetté une génération réelle. Chantier fermé → le report d'AVANT
+  // (ecart_we de la seule période précédente), pas l'absence de report :
+  // fermer ce chantier ne doit rien retirer au Val d'Allier.
+  const grandLivreOuvert = cabinetId
+    ? chantierOuvert('equite-grand-livre', {
+        estBacASable: await cabinetEstBacASable(supabase, cabinetId),
+      })
+    : false
 
-    for (const bm of (bmDb as BonusMalusDb[] | null) ?? []) {
-      // ecart_we positif = a fait plus → bm positif = doit faire moins ce tour
-      // On inverse le signe car dans le solver, bm positif = DOIT faire plus
-      bonusMalus[bm.veterinaire_id] = -bm.ecart_we
-    }
+  const grandLivre = grandLivreOuvert
+    ? await chargerGrandLivre(supabase, periode.date_debut, idsEffectif, cabinetId)
+    : await chargerReportDAvant(supabase, periode.date_debut, cabinetId)
+
+  // Une erreur de lecture ne doit PAS passer pour « aucun historique » :
+  // ce serait exactement « une erreur Supabase avalée devient zéro ligne »,
+  // et le planning sortirait sans le moindre rattrapage, sans un signe.
+  //
+  // ⚠️ MAIS ON N'INTERROMPT QUE LA GÉNÉRATION. Ce loader est aussi la
+  // première étape de la réparation d'absence (`lib/crise/contexte.ts`), de
+  // l'aperçu d'impact d'une règle (`data/controleImpact.ts`), des cases à
+  // pourvoir et de la validation de période — quatre chemins qui ne lisent
+  // JAMAIS `reportEquite` (la crise lui passe même volontairement un report
+  // vide). Lever pour tout le monde empêcherait Anne-So de remplacer un
+  // vétérinaire absent à cause d'un timeout sur une table d'historique,
+  // avec un message parlant d'équité : un symptôme sans aucun rapport avec
+  // ce qu'elle essayait de faire. Relevé par la revue du 2026-11-13.
+  if (grandLivre.erreur && options?.pourGeneration) {
+    throw new Error(
+      `Impossible de lire l'historique d'équité (${grandLivre.erreur}). ` +
+      'La génération est interrompue : générer sans lui produirait un planning ' +
+      'qui ignore ce que chacun a déjà donné, sans que rien ne le signale.',
+    )
   }
+
+  const reportEquite = grandLivre.report
 
   // 4b. #17 (Vague 5) — LOOKBACK INTER-PÉRIODES : les gardes des ~10 jours qui
   //     PRÉCÈDENT le début de la période. Sert aux SEULES règles de rythme
@@ -534,7 +585,7 @@ export async function chargerInputDepuisSupabase(
     dateFin: periode.date_fin,
     saison: periode.saison as 'ete' | 'hiver',
     vets,
-    bonusMalus,
+    reportEquite,
     calendrier,
     nbVetosSemaineSoir,
     equityWeights,
