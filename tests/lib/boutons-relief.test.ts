@@ -38,6 +38,8 @@ const SRC = join(process.cwd(), 'src')
 const STYLES = join(SRC, 'styles')
 const FEUILLE = join(STYLES, 'v2-boutons.css')
 const COQUILLE = join(SRC, 'app', '(v2)', 'layout.tsx')
+/** Les pages d'avant la connexion : hors coquille V2, sans cabinet. */
+const CONNEXION = [join(SRC, 'app', 'login', 'page.tsx'), join(SRC, 'app', 'set-password', 'page.tsx')]
 
 /** Le seul sélecteur de premier niveau admis dans la feuille. */
 export const LA_PORTE_CSS = 'body:has(.v2[data-boutons="relief"])'
@@ -291,9 +293,22 @@ describe('B-206 ① — le dessin « Relief » reste derrière sa porte', () => 
     expect(source).toMatch(/data-boutons=\{boutonsRelief \? 'relief' : undefined\}/)
   })
 
+  it('les pages de connexion posent l’attribut par la porte, cabinet inconnu', () => {
+    // Avant la connexion il n'y a pas de cabinet. Ces pages doivent donc
+    // interroger la porte avec « pas un bac à sable » : elle ne s'ouvre alors
+    // que si le chantier est ouvert à TOUS — jamais en dur, jamais pour un seul.
+    for (const f of CONNEXION) {
+      const source = readFileSync(f, 'utf8')
+      expect(source, rel(f)).toContain("chantierOuvert('boutons-relief', { estBacASable: false })")
+      const poses = source.match(/data-boutons=\{[^}]*\}/g) ?? []
+      expect(poses.length, rel(f)).toBeGreaterThan(0)
+      expect(poses.every((p) => p === 'data-boutons={BOUTONS}'), rel(f)).toBe(true)
+    }
+  })
+
   it('personne d’autre ne pose l’attribut ni n’importe la feuille', () => {
     const intrus = fichiers(SRC, /\.(ts|tsx|css)$/)
-      .filter((f) => f !== FEUILLE && f !== COQUILLE)
+      .filter((f) => f !== FEUILLE && f !== COQUILLE && !CONNEXION.includes(f))
       .filter((f) => {
         const s = readFileSync(f, 'utf8')
         return s.includes('data-boutons') || s.includes('v2-boutons.css')

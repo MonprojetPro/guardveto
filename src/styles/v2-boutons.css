@@ -41,9 +41,9 @@
       notifications sont rendus dans un portail, HORS de `.v2`.
 
    ⚠️ Les pages de connexion (`/login`, `/set-password`) ne sont pas dans
-      la coquille V2 et n'ont pas de cabinet : elles restent sur l'ancien
-      dessin tant que le chantier n'est pas ouvert à tous (B-206a). Leurs
-      familles (`co-*`) sont déjà raccordées ci-dessous.
+      la coquille V2 et n'ont pas de cabinet : elles posent l'attribut
+      elles-mêmes, par la même porte, qui ne s'y ouvre que si le chantier
+      est ouvert à TOUS les cabinets.
 
    ⚠️ Les rôles ne décident NI de la taille NI du remplissage : chaque
       famille garde sa géométrie, donc aucune mise en page ne bouge.
@@ -570,6 +570,7 @@ body:has(.v2[data-boutons="relief"]) {
   :is(
     .bt-champ,
     .field :is(input, select, textarea),
+    .co-champ input,
     [data-slot="input"],
     [data-slot="textarea"],
     [data-slot="select-trigger"],

@@ -24,6 +24,13 @@ import { ChampMotDePasse } from '@/components/v2/ChampMotDePasse'
 import { Calendar, Shield } from 'lucide-react'
 import '@/styles/v2-terrier.css'
 import '@/styles/v2-connexion.css'
+import '@/styles/v2-boutons.css'
+import { chantierOuvert } from '@/lib/produit/chantiers'
+
+// B-206 — le dessin « Relief » des boutons. Avant la connexion il n'y a pas de
+// cabinet : la porte de chantier ne peut donc s'ouvrir ici que si le chantier
+// est ouvert à TOUS les cabinets (jamais pour un bac à sable seul).
+const BOUTONS = chantierOuvert('boutons-relief', { estBacASable: false }) ? 'relief' : undefined
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(() => {
@@ -60,7 +67,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="v2 co-page">
+    <div className="v2 co-page" data-boutons={BOUTONS}>
       <Satin />
 
       <main className="co-scene">

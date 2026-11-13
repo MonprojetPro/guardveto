@@ -19,6 +19,13 @@ import { ChampMotDePasse } from '@/components/v2/ChampMotDePasse'
 import { logout } from '@/app/login/actions'
 import '@/styles/v2-terrier.css'
 import '@/styles/v2-connexion.css'
+import '@/styles/v2-boutons.css'
+import { chantierOuvert } from '@/lib/produit/chantiers'
+
+// B-206 — le dessin « Relief » des boutons. Avant la connexion il n'y a pas de
+// cabinet : la porte de chantier ne peut donc s'ouvrir ici que si le chantier
+// est ouvert à TOUS les cabinets (jamais pour un bac à sable seul).
+const BOUTONS = chantierOuvert('boutons-relief', { estBacASable: false }) ? 'relief' : undefined
 
 /** Les refus de Supabase arrivent en anglais : on traduit ceux qu'on connaît. */
 function messageErreurMotDePasse(code: string | undefined, brut: string): string {
@@ -152,7 +159,7 @@ export default function SetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="v2 co-page">
+      <div className="v2 co-page" data-boutons={BOUTONS}>
         <Satin />
         <p className="co-attente">
           <span className="co-spin" aria-hidden="true" />
@@ -163,7 +170,7 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="v2 co-page">
+    <div className="v2 co-page" data-boutons={BOUTONS}>
       <Satin />
 
       <main className="co-scene seule">

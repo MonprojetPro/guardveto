@@ -85,12 +85,14 @@ export const CHANTIERS: Record<string, Chantier> = {
     item: 'B-206',
     depuis: '2026-11-12',
     diffusion: {
-      bacASableSeulement:
-        'Direction A choisie par MiKL le 12/11 sur docs/maquettes/B-206-boutons.html. ' +
-        'Branchement ecran par ecran (lot 1 : Planning, socle .btn, boutons des fenetres). ' +
-        'Le Val d Allier ne bascule que sur validation de MiKL (B-206a). Ce chantier ne ' +
-        'rend aucun composant : il pose l attribut data-boutons sur la coquille V2, et ' +
-        'styles/v2-boutons.css ne s applique que sous cet attribut.',
+      tousLesCabinets:
+        'Direction A choisie par MiKL le 12/11 sur docs/maquettes/B-206-boutons.html, ' +
+        'generalisee a tout le site le meme jour (B-206a), au bac a sable seul. Bascule ' +
+        'decidee par MiKL le 13/11 : « c est parfait, deploie le sur tous les comptes ». ' +
+        'Ce chantier ne rend aucun composant : il pose l attribut data-boutons sur la ' +
+        'coquille V2 et sur les pages de connexion, et styles/v2-boutons.css ne s applique ' +
+        'que sous cet attribut. Revenir en arriere = repasser cette ligne en ' +
+        'bacASableSeulement ; les anciens styles sont encore en place (retrait : B-206c).',
     },
   },
 }
