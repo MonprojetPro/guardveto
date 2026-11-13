@@ -184,6 +184,16 @@ describe('Ce que Filou ne couvre pas encore est VISIBLE', () => {
       // pour Filou, par décision de MiKL (il explique et renvoie vers l'écran).
       // L'outil est ouvert au board (B-179d). Relever ce plafond doit rester un
       // geste écrit et daté, jamais une façon de faire taire le test.
-    ).toBeLessThanOrEqual(13)
+      //
+      // 13 → 14 le 13/11 (B-210) : le réglage « le cabinet ouvre les jours
+      // fériés » arrive sans outil d'ÉCRITURE — basculer le fonctionnement de
+      // toute l'équipe sur une phrase en passant mérite l'écran, où l'admin lit
+      // en même temps ce que le réglage ne fait pas. Sa LECTURE, elle, est
+      // couverte le jour même : `lire_presences_recurrentes` rend
+      // `jours_feries_travailles`, sans quoi Filou aurait récité les habitudes
+      // d'un 25 décembre comme celles d'un mardi ordinaire. C'est la lecture
+      // qui comptait — un outil d'écriture absent fait dire « je ne sais pas
+      // faire », une lecture absente fait dire quelque chose de faux.
+    ).toBeLessThanOrEqual(14)
   })
 })

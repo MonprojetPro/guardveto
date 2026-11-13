@@ -270,7 +270,16 @@ export default async function PlanningPageV2({
       // fiche véto. Le try/catch est délibéré : une zone introuvable ne doit
       // jamais faire tomber l'écran planning pour un simple repère visuel.
       resoudreCabinetId(supabase)
-        .then((id) => supabase.from('cabinets').select('id, zone_scolaire').eq('id', id).maybeSingle())
+        // B-210 — `journees_feries_travailles` est lu DANS LA MÊME requête que
+        // la zone scolaire : une seconde lecture de `cabinets` sur un écran
+        // déjà jugé lent (B-116) ne se justifie pas pour un booléen.
+        .then((id) =>
+          supabase
+            .from('cabinets')
+            .select('id, zone_scolaire, journees_feries_travailles')
+            .eq('id', id)
+            .maybeSingle(),
+        )
         .catch(() => ({ data: null })),
     ])
 
@@ -278,6 +287,17 @@ export default async function PlanningPageV2({
   // absente (donnée cabinet incomplète) → aucune plage : la grille s'affiche
   // sans marquage plutôt que de mentir avec la zone d'un autre cabinet.
   const zone = (cabinetRes?.data as { zone_scolaire: string | null } | null)?.zone_scolaire ?? null
+  // B-210 — le cabinet travaille-t-il les jours fériés ?
+  //
+  // ⚠️ REPLI SUR `false`, ET IL EST SÛR ICI, contrairement à l'écran de réglage.
+  //    Cette valeur ne sert qu'à NE PAS AFFIRMER qu'une présence « était
+  //    prévue » un jour férié. Se replier sur « fermé » fait taire la mention ;
+  //    se replier sur « ouvert » la ferait afficher à tort, et c'est ce
+  //    sens-là qui ment. Le `.catch()` juste au-dessus rend déjà `data: null`
+  //    sans faire tomber l'écran : on reste cohérent avec lui.
+  const feriesTravailles =
+    (cabinetRes?.data as { journees_feries_travailles?: boolean } | null)
+      ?.journees_feries_travailles ?? false
   const vacancesRes = zone
     ? await supabase
         .from('vacances_scolaires')
@@ -1074,6 +1094,12 @@ export default async function PlanningPageV2({
                 // qui décide dans QUELLE colonne un absent se range.
                 creneau: t.creneau,
               }))}
+            // B-210 — sans ça, la fenêtre d'un 11 novembre affirmait « sa
+            // récurrence le prévoyait » alors que le cabinet est fermé et que
+            // le remplissage n'y pose rien. La grille affichait en même temps
+            // l'étiquette « Férié » juste au-dessus : deux phrases contraires
+            // sur le même écran.
+            feriesTravailles={feriesTravailles}
             // B-163e ③ — ce que les RÉCURRENCES prévoient, pour que la fenêtre
             // d'un absent puisse dire « il était prévu » au lieu du trompeur
             // « Rien d'inscrit ». Le nom de la tranche est résolu ici : la

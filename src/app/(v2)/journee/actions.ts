@@ -188,6 +188,79 @@ export async function basculerBloc(id: string, actif: boolean): Promise<Resultat
 }
 
 /**
+ * B-210 — le cabinet travaille-t-il les jours fériés en journée ?
+ *
+ * Proposition de la cliente (Val d'Allier), relayée par MiKL le 13/11 : « le
+ * logiciel devrait considérer que personne ne travaille en journée lors d'un
+ * jour férié ». Puis, le même jour : « une option dans les réglages journées
+ * […] et par défaut on part du principe que non ».
+ *
+ * ⚠️ CE RÉGLAGE NE DÉFAIT RIEN, ET NE REFAIT RIEN. L'éteindre ne retire aucune
+ *    présence déjà posée sur un férié ; l'allumer n'en pose aucune. Il décide
+ *    du PROCHAIN remplissage, un point c'est tout. C'est la règle additive du
+ *    module (`lib/journee/presences.ts`), et la décision de MiKL du 13/11 sur
+ *    l'existant : « on s'en fout, […] ça sera pour les prochains ».
+ *
+ *    L'écran doit donc le dire, sans quoi l'admin allumerait l'option en
+ *    attendant que ses 25 décembre se remplissent tout seuls.
+ *
+ * 🔴 PASSE PAR UNE RPC, ET UN `.update()` DIRECT AURAIT ÉTÉ UN PIÈGE MUET.
+ *    `public.cabinets` n'a AUCUNE policy RLS `UPDATE` pour `authenticated` —
+ *    vérifié en base le 13/11 (`pg_policies` ne rend qu'une ligne pour cette
+ *    table : `cabinets_select`, en SELECT). Un `.update()` depuis le client
+ *    authentifié ne lève donc aucune erreur : il touche zéro ligne et rend
+ *    `error = null`. Cette action aurait répondu « enregistré » sans rien
+ *    écrire, et l'interrupteur serait revenu à sa place au rafraîchissement.
+ *
+ *    ⚠️ AUCUN TEST NE POUVAIT L'ATTRAPER : la suite ne touche pas la base. Le
+ *       défaut a été trouvé en LISANT les policies, et c'est la troisième fois
+ *       qu'il est payé sur cette table — voir
+ *       `20260827200000_rpc_configurer_agenda_cabinet.sql`, qui le raconte déjà
+ *       pour l'agenda Google.
+ *
+ *    La RPC `configurer_feries_journees` porte donc la garde ET l'écriture :
+ *    `SECURITY DEFINER`, refus bruyant si le rôle n'est pas admin, et
+ *    `WHERE id = auth_cabinet_actif()` — le cabinet vient du JWT, jamais du
+ *    formulaire. C'est le même modèle que les trois autres réglages de
+ *    `cabinets`.
+ *
+ * ⚠️ LA GARDE EXISTE DONC DEUX FOIS, et c'est voulu : `porteOuverte` refuse un
+ *    non-admin ici, la RPC le refuse en base. Deux gardiens qui disent la même
+ *    chose — la convention du projet.
+ *
+ * ⚠️ LE REFUS N'EMPRUNTE PAS `messageLisible` : ses phrases parlent de tranches
+ *    horaires. Annoncer « vous n'avez pas le droit de modifier les tranches »
+ *    pour un réglage de cabinet enverrait chercher un problème de droits là où
+ *    il n'y en a pas.
+ */
+export async function reglerFeriesTravailles(valeur: boolean): Promise<Resultat> {
+  const porte = await porteOuverte()
+  if (!porte.ok) return { error: porte.probleme }
+  const { supabase } = porte
+
+  // `valeur === true` : la valeur vient d'un formulaire, et une chaîne « false »
+  // — non vide, donc vraie — rangerait le réglage à l'envers.
+  const { error } = await supabase.rpc('configurer_feries_journees', {
+    p_travailles: valeur === true,
+  })
+
+  if (error) {
+    return {
+      error:
+        error.message.includes('administrateur') || error.message.includes('row-level security')
+          ? 'Vous n’avez pas le droit de modifier les réglages de ce cabinet.'
+          : 'Le réglage n’a pas pu être enregistré. Rien n’a été modifié.',
+    }
+  }
+
+  // Les deux écrans concernés : celui qui porte le réglage, et le planning dont
+  // le prochain remplissage en dépend.
+  revalidatePath('/regles')
+  revalidatePath('/planning')
+  return { success: true }
+}
+
+/**
  * Traduit un refus de Postgres en phrase lisible.
  *
  * Sans ce passage, l'admin lirait « duplicate key value violates unique

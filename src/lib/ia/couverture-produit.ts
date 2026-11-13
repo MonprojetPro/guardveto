@@ -208,6 +208,24 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'v2/journee#creerBloc': { outil: 'creer_tranche_journee' },
   'v2/journee#modifierBloc': { outil: 'modifier_tranche_journee' },
   'v2/journee#basculerBloc': { outil: 'agir_sur_tranche_journee' },
+  // ── B-210 — LE RÉGLAGE DES JOURS FÉRIÉS ────────────────────────────────────
+  //
+  // ⚠️ LA LECTURE, ELLE, EST COUVERTE, ET C'ÉTAIT L'URGENCE. Un outil d'écriture
+  //    manquant fait dire « je ne sais pas le faire » — désagréable, pas faux.
+  //    Une lecture manquante fait dire « Anne-Sophie est là tous les mardis » un
+  //    25 décembre, avec l'aplomb d'une réponse complète. `jours_feries_travailles`
+  //    et `note_jours_feries` voyagent donc dans la réponse de
+  //    `lire_presences_recurrentes` depuis ce lot.
+  //
+  // L'écriture attend, et c'est assumé : basculer le fonctionnement du cabinet
+  // les jours fériés pour toute l'équipe sur une phrase en passant (« ah, et on
+  // travaille les fériés ») est un geste qui mérite d'être posé à l'écran, où
+  // l'admin lit en même temps ce que le réglage ne fait PAS (il ne reprend pas
+  // les présences déjà posées).
+  'v2/journee#reglerFeriesTravailles': {
+    manque:
+      'Filou ne sait pas régler si le cabinet travaille les jours fériés (B-210, 13/11) — le geste reste à l’écran, dans Organisation › Journées. Il SAIT en revanche le lire et doit le dire : `lire_presences_recurrentes` rend `jours_feries_travailles`, et sans cette information il annoncerait les habitudes d’un jour férié comme un jour ordinaire.',
+  },
   // B-147 — `creerTrames` au PLURIEL depuis le 06/10 : l'écran vise plusieurs
   // jours d'un coup. L'outil de Filou, lui, n'en propose toujours qu'un — il
   // passe par la même action avec une liste d'un seul jour. Limite assumée :
@@ -480,19 +498,6 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   'api/webhooks/brevo#POST': {
     hors: 'Point d’entrée appelé par Brevo pour dire ce qu’un e-mail est devenu. Ce n’est pas un geste du cabinet, c’est une notification entrante.',
   },
-  // B-207 (12/11) — le guichet du Hub MPP. Ces routes ne sont appelées que par
-  // le Hub, avec un secret partagé : aucune personne du cabinet ne les déclenche.
-  // ⚠️ La réponse qui DEVENAIT incomplète : « qu'y a-t-il dans la Messagerie ? »
-  // — Filou décrivait le fil d'équipe et les conversations à deux, sans le fil
-  // « MonProjetPro ». Réglé dans `blocMessagerie` (agentFilou.ts).
-  'api/hub/ping#GET': {
-    hors: 'Le Hub MPP vérifie que le guichet répond (secret partagé). Aucune personne du cabinet ne l’appelle.',
-  },
-  'api/hub/messagerie/envoyer#POST': {
-    hors:
-      'MonProjetPro écrit à une personne depuis le Hub, dans son fil « MonProjetPro » (B-207). C’est la voix de ' +
-      'l’éditeur, pas un geste du cabinet : Filou ne l’envoie pas, il sait seulement que ce fil existe (blocMessagerie).',
-  },
   'api/gardes/[id]/disponibilites#GET': {
     hors: 'Calcul de disponibilité affiché par la modale de garde. C’est ce que Filou obtient déjà autrement (règles + planning) ; l’exposer serait un doublon de lecture.',
   },
@@ -504,6 +509,28 @@ export const COUVERTURE_FILOU: Record<string, Couverture> = {
   },
   'auth/confirm#GET': {
     hors: 'Confirmation d’un lien d’invitation ou de réinitialisation. Se joue hors session, avant que Filou existe pour cette personne.',
+  },
+
+  // ── LE GUICHET DU HUB MPP (B-207, livré le 12/11) ──────────────────────────
+  //
+  // 🔴 CES DEUX LIGNES MANQUAIENT DEPUIS LE 12/11, et le test qui devait le
+  //    crier criait dans le vide : Vitest ramassait aussi les tests des
+  //    worktrees voisins, et ses huit échecs noyaient celui-ci. Corrigé le
+  //    13/11 en même temps que B-210 (`vitest.config.ts`, exclusion de
+  //    `.claude/worktrees/**`). Un détecteur de fumée posé au-dessus de la
+  //    plaque, une fois de plus.
+  //
+  // `hors`, et sans hésitation : ces routes ne sont pas du produit vétérinaire.
+  // Elles sont la porte de service par laquelle MonProjetPro administre ses
+  // cabinets clients, authentifiée par un secret partagé et appelée par le Hub,
+  // jamais par quelqu'un du cabinet. Filou est l'assistant DU CABINET : lui
+  // donner prise sur cette porte reviendrait à exposer l'administration de tous
+  // les clients à la conversation de l'un d'eux.
+  'api/hub/ping#GET': {
+    hors: 'Voyant « guichet connecté » du Hub MonProjetPro, authentifié par secret partagé. Appelé par le Hub, jamais depuis le cabinet — rien à en dire à quelqu’un qui parle à Filou.',
+  },
+  'api/hub/messagerie/envoyer#POST': {
+    hors: 'MonProjetPro écrit à un cabinet depuis son Hub. C’est l’autre bout du fil « MonProjetPro » : côté cabinet, la lecture et la réponse passent par la messagerie, qui a ses propres outils. Exposer l’envoi ici permettrait d’écrire au nom de MonProjetPro.',
   },
 }
 

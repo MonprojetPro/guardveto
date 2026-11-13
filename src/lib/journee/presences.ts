@@ -35,6 +35,17 @@
 
 import type { BlocJournee, CreneauBlocJournee, JourTrame, PariteSemaine } from '@/types'
 import { trameViseCetteDate } from './trames'
+// B-210 — LA MÊME FONCTION QUE CELLE QUI DESSINE L'ÉTIQUETTE « Férié ».
+//
+// ⚠️ ET SANS CALENDRIER RÉSOLU, EXPRÈS. `GrilleSemainesV2` (ligne 381) et
+//    `JourneeDashboardModale` (ligne 274) appellent `estJourFerie(date)` tout
+//    court. Passer ici un calendrier de cabinet ferait diverger ce qui est POSÉ
+//    de ce qui est ÉTIQUETÉ : un jour marqué « Férié » à l'écran recevrait des
+//    présences, ou l'inverse — sans qu'aucune ligne ne l'explique. C'est
+//    exactement la forme du bug B-209 (parité affichée ≠ parité appliquée),
+//    payé l'avant-veille. Le jour où l'écran lira un calendrier régional, cet
+//    appel le lira DANS LE MÊME COMMIT.
+import { estJourFerie } from '@/engine/utils'
 // B-163 — l'unique autorité sur ce qu'une absence retire.
 import { blocsRetires, lirePerimetre, type PerimetreAbsence } from '@/lib/absences/perimetre'
 
@@ -211,20 +222,97 @@ export function presencesVoulues(
    * que MiKL a signalé le 06/10 en disant « et les absences programmées ».
    */
   absences: readonly AbsencePourPresences[] = [],
+  /** B-210 — voir `projeterPresences`. Replié sur le défaut du produit. */
+  feriesTravailles = false,
 ): PresenceVoulue[] {
+  return projeterPresences(trames, blocs, periode, absences, feriesTravailles).voulues
+}
+
+/**
+ * Ce qu'une projection a retenu, et ce qu'elle a écarté — avec le motif.
+ *
+ * ⚠️ LIMITE CONNUE, RELEVÉE PAR LA REVUE DU 13/11 ET NON CORRIGÉE ICI (→ B-210a) :
+ *    ces compteurs comptent les cases écartées AVANT de savoir lesquelles sont
+ *    déjà posées en base. Une présence posée à la main un jour férié se fait
+ *    donc annoncer « non posée », et l'administratrice lit un chiffre qu'elle ne
+ *    retrouve pas sur son planning. Le premier cabinet du produit est dans ce
+ *    cas — il a posé ses fériés à la main avant que cette règle existe.
+ *
+ *    ⚠️ CE DÉFAUT N'EST PAS NÉ ICI : il existe pour les absences depuis B-148,
+ *       où le compte sortait de la soustraction de deux projections calculées
+ *       l'une comme l'autre AVANT de retirer ce qui était déjà en base. B-210
+ *       le reproduit à l'identique pour les fériés ; le correctif vaut pour les
+ *       deux motifs à la fois, puisque c'est le même calcul.
+ */
+export interface Projection {
+  /** Les présences à poser, une fois tous les écarts appliqués. */
+  voulues: PresenceVoulue[]
+  /** B-148 — écartées parce que la personne est absente ce jour-là. */
+  ecarteesPourAbsence: number
+  /** B-210 — écartées parce que le jour est férié et que le cabinet est fermé. */
+  ecarteesPourFerie: number
+}
+
+/**
+ * La projection complète : ce qui est voulu, et ce qui a été écarté, avec le
+ * motif de chaque écart.
+ *
+ * 🔑 C'EST LE SEUL CORPS DE LOGIQUE. `presencesVoulues` n'est qu'une vue sur
+ *    cette fonction, et ne refait aucun calcul : une mesure vit dans le CORPS
+ *    d'une fonction, pas dans sa signature (leçon du 16/10). Deux projections
+ *    parallèles auraient fini par diverger — c'est ce qui a coûté B-130b.
+ *
+ * ⚠️ POURQUOI LES ÉCARTS SONT COMPTÉS ICI, ET PLUS PAR SOUSTRACTION. Avant
+ *    B-210, l'appelant comptait les absences en lançant DEUX projections et en
+ *    soustrayant les longueurs. Avec deux motifs d'écart, cette méthode
+ *    demanderait trois projections et attribuerait de travers toute case
+ *    écartée par les deux à la fois. On compte donc au moment où l'on écarte,
+ *    là où le motif est connu avec certitude.
+ *
+ * ⚠️ LE FÉRIÉ EST TESTÉ AVANT L'ABSENCE, et une case n'est comptée qu'une fois.
+ *    L'ordre est un choix de message, pas de hasard : un 25 décembre où le
+ *    cabinet est fermé n'a pas à s'annoncer « 12 présences non posées : la
+ *    personne est absente ». La raison englobante prime sur la raison
+ *    individuelle.
+ */
+export function projeterPresences(
+  trames: readonly TramePourProjection[],
+  blocs: readonly (Pick<BlocJournee, 'id' | 'actif'> & { creneau?: CreneauBlocJournee })[],
+  periode: PeriodePourPresences,
+  absences: readonly AbsencePourPresences[] = [],
+  /**
+   * B-210 — le cabinet travaille-t-il les jours fériés ?
+   *
+   * ⚠️ `false` PAR DÉFAUT, et ce n'est pas un repli de confort : c'est le défaut
+   *    PRODUIT, tranché par MiKL le 13/11 (« par défaut on part du principe que
+   *    non »). Un appelant qui oublie ce paramètre se comporte donc comme le
+   *    produit l'annonce, au lieu de poser silencieusement des présences un
+   *    jour férié — l'erreur que ce lot corrige.
+   */
+  feriesTravailles = false,
+): Projection {
   const blocsActifs = new Set(blocs.filter((b) => b.actif).map((b) => b.id))
   // Le créneau de chaque bloc, pour décider bloc par bloc et non jour par jour.
   const creneauParBloc = new Map<string, CreneauBlocJournee>(
     blocs.map((b) => [b.id, b.creneau ?? 'journee']),
   )
   const utiles = trames.filter((t) => t.actif && blocsActifs.has(t.bloc_id))
-  if (utiles.length === 0) return []
+  if (utiles.length === 0) {
+    return { voulues: [], ecarteesPourAbsence: 0, ecarteesPourFerie: 0 }
+  }
 
   const dates = datesDeLaPeriode(periode.date_debut, periode.date_fin)
   const voulues: PresenceVoulue[] = []
   const vues = new Set<string>()
+  let ecarteesPourAbsence = 0
+  let ecarteesPourFerie = 0
 
   for (const date of dates) {
+    // B-210 — UN JOUR FÉRIÉ, LE CABINET EST FERMÉ EN JOURNÉE, sauf si le
+    // cabinet a dit le contraire. Testé une fois par jour et non par trame :
+    // c'est une propriété du jour, pas de la personne.
+    const ferie = !feriesTravailles && estJourFerie(date)
+
     for (const t of utiles) {
       if (
         !trameViseCetteDate(
@@ -234,6 +322,36 @@ export function presencesVoulues(
       ) {
         continue
       }
+
+      // ── LE DÉDOUBLONNAGE PASSE AVANT LES ÉCARTS (B-210) ───────────────────
+      //
+      // Deux trames peuvent viser la même case (« toutes les semaines » et
+      // « semaines impaires » sur le même jour et la même tranche). L'index
+      // unique de la base refuserait la seconde : on dédoublonne AVANT d'écrire,
+      // sinon l'application échouerait sur une saisie que le lot 1 autorise.
+      //
+      // 🔴 CE TEST ÉTAIT PLUS BAS, ET IL DEVAIT REMONTER. Les écarts sont
+      //    désormais COMPTÉS ; laissé en bas, un 25 décembre visé par deux
+      //    trames aurait compté 2 présences non posées là où le planning n'en
+      //    montre qu'une. Les anciens compteurs ne pouvaient pas avoir ce
+      //    défaut : ils soustrayaient deux listes déjà dédoublonnées.
+      //
+      // La clé identifie LA CASE (personne, tranche, jour) — pas la décision
+      // qu'on prend dessus. La marquer vue avant de trancher est donc exact,
+      // qu'on finisse par la poser ou par l'écarter.
+      const cle = clePresence({ veterinaire_id: t.veterinaire_id, bloc_id: t.bloc_id, date })
+      if (vues.has(cle)) continue
+      vues.add(cle)
+
+      // B-210 — compté APRÈS `trameViseCetteDate` : seules les cases que la
+      // trame visait réellement ce jour-là sont « non posées ». Compter tout
+      // le monde un jour férié annoncerait un chiffre que personne ne
+      // reconnaîtrait sur son planning.
+      if (ferie) {
+        ecarteesPourFerie++
+        continue
+      }
+
       // ⚠️ L'ABSENCE L'EMPORTE SUR L'HABITUDE, toujours. Une trame dit « elle
       //    est là d'habitude le mardi » ; un congé dit « pas ce mardi-là ».
       //    Poser quand même aurait affiché au comptoir quelqu'un qui est en
@@ -250,26 +368,19 @@ export function presencesVoulues(
           creneauParBloc.get(t.bloc_id) ?? 'journee',
         )
       ) {
+        ecarteesPourAbsence++
         continue
       }
 
-      const p: PresenceVoulue = {
+      voulues.push({
         veterinaire_id: t.veterinaire_id,
         bloc_id: t.bloc_id,
         date,
         trame_id: t.id,
-      }
-      // Deux trames peuvent viser la même case (« toutes les semaines » et
-      // « semaines impaires » sur le même jour et la même tranche). L'index
-      // unique de la base refuserait la seconde : on dédoublonne AVANT d'écrire,
-      // sinon l'application échouerait sur une saisie que le lot 1 autorise.
-      const cle = clePresence(p)
-      if (vues.has(cle)) continue
-      vues.add(cle)
-      voulues.push(p)
+      })
     }
   }
-  return voulues
+  return { voulues, ecarteesPourAbsence, ecarteesPourFerie }
 }
 
 /**
@@ -303,6 +414,8 @@ export interface ResumeApplication {
   personnes: number
   /** B-148 — présences qu'une absence a empêché de poser. */
   ecarteesPourAbsence: number
+  /** B-210 — présences qu'un jour férié a empêché de poser. */
+  ecarteesPourFerie: number
   /** Phrase prête à afficher — une seule formulation, écran et confirmation. */
   phrase: string
 }
@@ -312,16 +425,16 @@ export function resumeApplication(
   aEcrire: readonly PresenceVoulue[],
   /**
    * B-148 — combien de présences ont été écartées parce que la personne est
-   * absente. Se calcule en comparant deux projections, l'une sans absences :
+   * absente, et B-210 parce que le jour est férié. Les deux chiffres sortent
+   * désormais de `projeterPresences`, qui compte au moment où il écarte.
    *
-   *   presencesVoulues(…).length - presencesVoulues(…, absences).length
-   *
-   * ⚠️ CE CHIFFRE DOIT ÊTRE DIT, pas tu. Sans lui, l'admin voit « 38 présences »
-   *    là où elle en attendait 42 et n'a aucun moyen de savoir si le produit a
-   *    bien fait son travail ou s'il a perdu quatre lignes. Un écart silencieux
-   *    sur un planning se lit toujours comme une panne.
+   * ⚠️ CES CHIFFRES DOIVENT ÊTRE DITS, pas tus. Sans eux, l'admin voit
+   *    « 38 présences » là où elle en attendait 42 et n'a aucun moyen de savoir
+   *    si le produit a bien fait son travail ou s'il a perdu quatre lignes. Un
+   *    écart silencieux sur un planning se lit toujours comme une panne.
    */
   ecarteesPourAbsence = 0,
+  ecarteesPourFerie = 0,
 ): ResumeApplication {
   const personnes = new Set(aEcrire.map((p) => p.veterinaire_id)).size
   const inchangees = voulues.length - aEcrire.length
@@ -330,28 +443,37 @@ export function resumeApplication(
     ecarteesPourAbsence > 0
       ? ` ${ecarteesPourAbsence} présence${ecarteesPourAbsence > 1 ? 's' : ''} non posée${ecarteesPourAbsence > 1 ? 's' : ''} : la personne est absente ce jour-là.`
       : ''
+  // B-210 — sa propre phrase, et pas un motif fondu dans celui des absences :
+  // l'admin doit pouvoir distinguer « quelqu'un manque » (à vérifier) de « le
+  // cabinet est fermé » (normal, et réglable). La seconde dit OÙ se change le
+  // réglage, sinon le chiffre se lit comme une limite du produit.
+  const feries =
+    ecarteesPourFerie > 0
+      ? ` ${ecarteesPourFerie} présence${ecarteesPourFerie > 1 ? 's' : ''} non posée${ecarteesPourFerie > 1 ? 's' : ''} : ${ecarteesPourFerie > 1 ? 'ces jours sont fériés' : 'ce jour est férié'}. Si le cabinet ouvre les jours fériés, dites-le dans Organisation › Journées.`
+      : ''
+  const ecarts = feries + absents
 
   let phrase: string
-  if (voulues.length === 0 && ecarteesPourAbsence === 0) {
+  if (voulues.length === 0 && ecarteesPourAbsence === 0 && ecarteesPourFerie === 0) {
     phrase =
       'Aucune trame de présence ne s’applique à cette période. Définissez-les dans Organisation › Journées avant d’appliquer.'
   } else if (voulues.length === 0) {
     // Des trames existent, mais tout le monde est absent sur la fenêtre. Le
     // dire franchement vaut mieux que « aucune trame ne s'applique », qui
     // enverrait l'admin corriger des règles parfaitement justes.
-    phrase = `Rien à poser sur cette période.${absents}`
+    phrase = `Rien à poser sur cette période.${ecarts}`
   } else if (n === 0) {
     phrase =
       `Tout est déjà en place : ${voulues.length} présence${voulues.length > 1 ? 's' : ''}, aucune à ajouter.` +
-      absents
+      ecarts
   } else {
     phrase =
       `${n} présence${n > 1 ? 's' : ''} à poser pour ${personnes} personne${personnes > 1 ? 's' : ''}` +
       (inchangees > 0 ? `, ${inchangees} déjà en place.` : '.') +
-      absents
+      ecarts
   }
 
-  return { aPoser: n, inchangees, personnes, ecarteesPourAbsence, phrase }
+  return { aPoser: n, inchangees, personnes, ecarteesPourAbsence, ecarteesPourFerie, phrase }
 }
 
 // ── La retouche à la main ────────────────────────────────────────────────────

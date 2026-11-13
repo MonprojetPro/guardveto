@@ -42,7 +42,7 @@ import {
   // dans l'action, c'est la voir diverger un jour sans que rien ne le dise.
   estAbsentSurCeBloc,
   presenceDejaPosee,
-  presencesVoulues,
+  projeterPresences,
   resumeApplication,
   validerPresence,
   type AbsencePourPresences,
@@ -51,6 +51,9 @@ import {
   type SaisiePresence,
   type TramePourProjection,
 } from '@/lib/journee/presences'
+// B-210 — la MÊME fonction que la projection et que l'étiquette « Férié » de la
+// grille, appelée de la MÊME façon (sans calendrier régional).
+import { estJourFerie } from '@/engine/utils'
 import type { BlocJournee } from '@/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -81,6 +84,8 @@ export type Apercu =
       personnes: number
       /** B-148 — présences qu'une absence a empêché de poser. */
       ecarteesPourAbsence: number
+      /** B-210 — présences qu'un jour férié a empêché de poser. */
+      ecarteesPourFerie: number
       phrase: string
     }
   | { ok: false; probleme: string }
@@ -182,6 +187,44 @@ interface PresenceLue {
   bloc_id: string
   date: string
   trame_id: string | null
+}
+
+/**
+ * Le cabinet travaille-t-il les jours fériés ? — B-210.
+ *
+ * ⚠️ UNE LECTURE RATÉE N'EST PAS UN « NON ». Elle refuse le geste, comme celle
+ *    des absences juste en dessous. Replier sur `false` paraîtrait prudent — on
+ *    ne poserait rien de trop — mais un cabinet qui a dit « j'ouvre les jours
+ *    fériés » verrait ses fériés sautés en silence, et lirait « 12 présences non
+ *    posées : ces jours sont fériés » alors qu'il a réglé l'inverse. Un réglage
+ *    qui ne s'applique pas sans le dire est précisément ce que ce produit
+ *    combat ; mieux vaut un refus franc qu'un planning faux.
+ *
+ * ⚠️ AUCUN `.eq('id', …)` : la policy `cabinets_select` borne déjà la lecture à
+ *    `auth_cabinet_actif()`. Elle est PERMISSIVE et SEULE — pas RESTRICTIVE, et
+ *    la nuance compte : une seconde policy PERMISSIVE ajoutée un jour
+ *    s'additionnerait à celle-ci, plusieurs lignes reviendraient, et
+ *    `maybeSingle()` rendrait alors une erreur. C'est une raison de plus pour
+ *    que l'erreur soit lue, juste en dessous, plutôt qu'absorbée.
+ */
+async function feriesTravailles(
+  supabase: Client,
+): Promise<{ ok: true; valeur: boolean } | { ok: false; probleme: string }> {
+  const { data, error } = await supabase
+    .from('cabinets')
+    .select('journees_feries_travailles')
+    .maybeSingle()
+
+  if (error) {
+    return {
+      ok: false,
+      probleme: 'Le réglage des jours fériés n’a pas pu être lu. Rien n’a été modifié.',
+    }
+  }
+  // Pas de ligne lisible : la colonne est `NOT NULL DEFAULT false`, donc
+  // l'absence ne vient pas du réglage mais du cabinet. On retombe sur le défaut
+  // du produit, qui est aussi le plus conservateur.
+  return { ok: true, valeur: (data as { journees_feries_travailles?: boolean } | null)?.journees_feries_travailles ?? false }
 }
 
 /**
@@ -326,15 +369,20 @@ export async function apercuApplicationTrames(periodeId: string): Promise<Apercu
     return { ok: false, probleme: 'Les absences n’ont pas pu être lues. Aperçu impossible.' }
   }
 
-  // Deux projections : la seconde seule compte, la première sert UNIQUEMENT à
-  // dire combien d'absences ont empêché de poser. Un écart silencieux sur un
-  // planning se lit toujours comme une panne.
-  const sansAbsences = presencesVoulues(trames, blocs, per.periode)
-  const voulues = presencesVoulues(trames, blocs, per.periode, abs.absences)
+  const feries = await feriesTravailles(supabase)
+  if (!feries.ok) return { ok: false, probleme: feries.probleme }
+
+  // B-210 — UNE SEULE PROJECTION, qui compte elle-même ce qu'elle écarte.
+  // Avant, deux projections étaient soustraites pour obtenir le nombre
+  // d'absences ; avec un second motif d'écart, la soustraction aurait demandé
+  // une troisième projection et attribué de travers les cases écartées par les
+  // deux à la fois.
+  const proj = projeterPresences(trames, blocs, per.periode, abs.absences, feries.valeur)
   const r = resumeApplication(
-    voulues,
-    aPoser(voulues, deja.lignes),
-    sansAbsences.length - voulues.length,
+    proj.voulues,
+    aPoser(proj.voulues, deja.lignes),
+    proj.ecarteesPourAbsence,
+    proj.ecarteesPourFerie,
   )
   return { ok: true, ...r }
 }
@@ -370,10 +418,20 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
     return { error: 'Les absences n’ont pas pu être lues. Rien n’a été modifié.' }
   }
 
-  const sansAbsences = presencesVoulues(trames, blocs, per.periode)
-  const voulues = presencesVoulues(trames, blocs, per.periode, abs.absences)
+  const feries = await feriesTravailles(supabase)
+  if (!feries.ok) return { error: feries.probleme }
+
+  // B-210 — la MÊME projection que l'aperçu, avec le MÊME réglage lu de la même
+  // façon. Le nombre annoncé reste donc exactement celui qui sera écrit.
+  const proj = projeterPresences(trames, blocs, per.periode, abs.absences, feries.valeur)
+  const voulues = proj.voulues
   const aEcrire = aPoser(voulues, deja.lignes)
-  const resume = resumeApplication(voulues, aEcrire, sansAbsences.length - voulues.length)
+  const resume = resumeApplication(
+    voulues,
+    aEcrire,
+    proj.ecarteesPourAbsence,
+    proj.ecarteesPourFerie,
+  )
 
   // Rien à faire n'est pas une erreur : c'est le cas normal d'une seconde
   // application. On rend la phrase qui le dit, plutôt qu'un succès muet qui
@@ -424,6 +482,9 @@ export async function appliquerTrames(periodeId: string): Promise<Resultat> {
     message:
       `${n} présence${n > 1 ? 's' : ''} posée${n > 1 ? 's' : ''} sur ce planning` +
       (resume.inchangees > 0 ? `, ${resume.inchangees} étaient déjà en place.` : '.') +
+      (resume.ecarteesPourFerie > 0
+        ? ` ${resume.ecarteesPourFerie} non posée${resume.ecarteesPourFerie > 1 ? 's' : ''} : ${resume.ecarteesPourFerie > 1 ? 'ces jours sont fériés' : 'ce jour est férié'}. Si le cabinet ouvre les jours fériés, dites-le dans Organisation › Journées.`
+        : '') +
       (resume.ecarteesPourAbsence > 0
         ? ` ${resume.ecarteesPourAbsence} non posée${resume.ecarteesPourAbsence > 1 ? 's' : ''} : la personne est absente ce jour-là.`
         : ''),
@@ -488,6 +549,13 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
   if (abs.erreur) {
     return { error: 'Les absences n’ont pas pu être lues. Rien n’a été modifié.' }
   }
+
+  // B-210 — lu AVANT l'écriture, et son échec refuse le geste : poser sans
+  // savoir si le cabinet ouvre les jours fériés reviendrait à choisir entre
+  // avertir à tort et se taire à tort.
+  const feries = await feriesTravailles(supabase)
+  if (!feries.ok) return { error: feries.probleme }
+
   const bloc = blocs.find((b) => b.id === v.valeur.bloc_id)
   const absentIci = estAbsentSurCeBloc(
     abs.absences,
@@ -499,6 +567,21 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
     bloc?.creneau ?? 'journee',
   )
 
+  // ── B-210 — LE JOUR FÉRIÉ SE DIT, IL NE SE REFUSE PAS ─────────────────────
+  //
+  // Même raisonnement que l'absence juste au-dessus, et même mot d'ordre : « le
+  // système informe, il n'interdit pas ». Un cabinet fermé les jours fériés peut
+  // parfaitement avoir quelqu'un au cabinet un 1er mai — une urgence, un
+  // inventaire, une permanence. L'admin le sait, le produit non.
+  //
+  // ⚠️ CE QUI EST REFUSÉ, C'EST LE SILENCE. Sans cette ligne, l'admin pose une
+  //    présence un 25 décembre, « Remplir » n'en pose aucune autre ce jour-là,
+  //    et rien à l'écran n'explique pourquoi une journée a une seule personne.
+  //
+  // ⚠️ `estJourFerie` SANS CALENDRIER, comme la projection et comme l'étiquette
+  //    « Férié » de la grille. Trois endroits, une seule source de vérité.
+  const avertirFerie = !feries.valeur && estJourFerie(v.valeur.date)
+
   const { error } = await supabase
     .from('presences_journee')
     .insert({ ...v.valeur, cabinet_id: cabinetId })
@@ -507,15 +590,24 @@ export async function poserPresence(saisie: SaisiePresence): Promise<Resultat> {
 
   revalidatePath('/planning')
   programmerAgendasPerso(cabinetId) // B-173
+  // Les deux avertissements peuvent tomber ensemble (quelqu'un d'absent, posé
+  // un jour férié). On les JOINT au lieu d'en choisir un : taire le second
+  // laisserait l'admin corriger une moitié du problème en croyant l'avoir vu
+  // en entier.
+  const avertissements = [
+    avertirFerie
+      ? 'Ce jour est férié : le remplissage automatique n’y pose personne. Si le cabinet ouvre les jours fériés, dites-le dans Organisation › Journées.'
+      : null,
+    absentIci ? 'Cette personne est notée absente sur cette tranche ce jour-là.' : null,
+  ].filter(Boolean)
+
   return {
     success: true,
     message: 'Présence ajoutée.',
     // Le prénom n'est pas repris ici : l'écran qui appelle sait QUI il vient de
     // poser, et aller le chercher demanderait une requête de plus pour une
     // information que l'appelant a déjà sous les yeux.
-    ...(absentIci
-      ? { avertissement: 'Cette personne est notée absente sur cette tranche ce jour-là.' }
-      : {}),
+    ...(avertissements.length > 0 ? { avertissement: avertissements.join(' ') } : {}),
   }
 }
 

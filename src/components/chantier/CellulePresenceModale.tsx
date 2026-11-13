@@ -103,6 +103,7 @@ export function CellulePresenceModale({
   tranches,
   indisponibilites = [],
   prevuParRecurrence = [],
+  jourFerieFerme = false,
   onFermer,
 }: {
   /** `AAAA-MM-JJ`, ou `null` quand rien n'est ouvert. */
@@ -133,6 +134,16 @@ export function CellulePresenceModale({
    * dise (« une convention recopiée trois fois », payé le 02/10).
    */
   prevuParRecurrence?: { tranche: string; heures: string }[]
+  /**
+   * B-210 — ce jour est férié ET le cabinet est fermé les jours fériés.
+   *
+   * 🔑 C'EST UN MOTIF, PAS UNE DÉCORATION. Sans lui, la fenêtre d'un jour férié
+   *    retombe sur « Rien d'inscrit » — et le commentaire ci-dessus dit
+   *    pourquoi c'est dangereux : ça se lit « il ne travaille pas ce jour-là »,
+   *    donc on ne cherche pas plus loin. Ici la vraie raison est connue, elle
+   *    n'a aucune raison d'être tue.
+   */
+  jourFerieFerme?: boolean
   onFermer: () => void
 }) {
   const router = useRouter()
@@ -267,7 +278,24 @@ export function CellulePresenceModale({
                      jamais la case vide, c'est la phrase rassurante qui répond
                      à une question qu'on n'a pas posée.
                 */
-                prevuParRecurrence.length > 0 ? (
+                // B-210 — le férié passe AVANT la récurrence : quand le cabinet
+                // est fermé, la question « sa récurrence le prévoyait-elle ? »
+                // ne se pose plus. La raison englobante prime sur la raison
+                // individuelle, comme dans le compte du remplissage.
+                jourFerieFerme ? (
+                  <div className="cpm-prevu">
+                    <p>
+                      <b>Jour férié</b> — le cabinet est fermé ce jour-là, les semaines types ne
+                      s’y appliquent pas.
+                    </p>
+                    <p>
+                      <small>
+                        Si le cabinet ouvre les jours fériés, dites-le dans Organisation ›
+                        Journées.
+                      </small>
+                    </p>
+                  </div>
+                ) : prevuParRecurrence.length > 0 ? (
                   <div className="cpm-prevu">
                     <p>
                       <b>Rien ce jour-là</b> — mais sa récurrence le prévoyait :

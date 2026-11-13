@@ -535,3 +535,65 @@
   border: 0;
   padding: 0;
 }
+
+/* ============================================================
+   B-210 — Les jours fériés en journée
+   ============================================================
+   Classes `fj-*` à elles seules, et surtout PAS une reprise de `.aa-switch`
+   (réglages de l'agenda) : une feuille partagée qui redessine des commandes
+   qu'on croyait à soi a coûté trois recettes le 16/10. Le dessin est volontairement
+   celui des cartes voisines `.bj-*`, repris et non hérité.
+   ============================================================ */
+
+.fj-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.fj-switch input {
+  flex: none;
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.fj-switch input:disabled,
+.fj-switch:has(input:disabled) {
+  cursor: progress;
+}
+
+.fj-switch span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fj-switch b {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.fj-switch small {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--soft);
+}
+
+/* La portée du réglage. Elle est DITE, pas suggérée : sans elle, allumer
+   l'option laisse croire que les jours fériés déjà passés vont se remplir. */
+.fj-portee {
+  margin: 12px 0 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 68ch;
+}

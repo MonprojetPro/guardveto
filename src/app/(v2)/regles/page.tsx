@@ -37,6 +37,7 @@ import {
   type ResumesPlannings,
 } from '@/components/v2/OrganisationParties'
 import { BlocsJournee } from '@/components/v2/BlocsJournee'
+import { FeriesJournee } from '@/components/v2/FeriesJournee'
 import { ModuleEteint } from '@/components/v2/ModuleEteint'
 import { TramesJournee } from '@/components/v2/TramesJournee'
 import { modulesDuCabinet } from '@/lib/produit/modules-serveur'
@@ -412,7 +413,13 @@ async function PartieJournees({
   // La RLS borne au cabinet (policy RESTRICTIVE). On lit TOUT, actif ou non :
   // l'écran range lui-même les lignes retirées, et les masquer ici rendrait la
   // remise en service impossible depuis l'interface.
-  const [{ data: dataBlocs }, { data: dataTrames }, { data: dataEquipe }, dock] = await Promise.all([
+  const [
+    { data: dataBlocs },
+    { data: dataTrames },
+    { data: dataEquipe },
+    dock,
+    { data: dataCabinet },
+  ] = await Promise.all([
     supabase
       .from('blocs_journee')
       .select('id, cabinet_id, nom, debut, fin, creneau, ordre, actif')
@@ -428,12 +435,24 @@ async function PartieJournees({
       .eq('actif', true)
       .order('prenom', { ascending: true }),
     chargerDock(supabase, vet),
+    // B-210 — le réglage des jours fériés. La policy `cabinets_select` borne
+    // déjà à `auth_cabinet_actif()` : aucun filtre à ajouter ici.
+    supabase.from('cabinets').select('journees_feries_travailles').maybeSingle(),
   ])
 
   const blocs = (dataBlocs ?? []) as BlocJournee[]
   const trames = (dataTrames ?? []) as TrameJournee[]
   const equipe = (dataEquipe ?? []) as Veterinaire[]
   const tranchesActives = blocs.filter((b) => b.actif)
+  // ⚠️ `null` EST UN TROISIÈME ÉTAT, et il ne se replie pas sur `false`. Une
+  //    lecture ratée affichée « décoché » se lit comme un réglage posé : l'admin
+  //    croirait son cabinet fermé les jours fériés, et un clic écraserait
+  //    peut-être l'inverse de ce qu'elle voulait. L'écran dit donc qu'il n'a pas
+  //    pu lire, plutôt que d'inventer une réponse — même raisonnement que la
+  //    réponse de Filou (`lib/ia/outils/journee.ts`).
+  const feriesTravailles =
+    (dataCabinet as { journees_feries_travailles?: boolean } | null)
+      ?.journees_feries_travailles ?? null
 
   return (
     <>
@@ -462,6 +481,11 @@ async function PartieJournees({
         {estAdmin ? (
           <>
             <BlocsJournee blocs={blocs} />
+            {/* B-210 — entre les tranches et les semaines types : c'est un
+                réglage du CABINET, qui décide ensuite comment les semaines
+                types s'appliquent. Le lire après coup laisserait croire qu'il
+                ne concerne que la personne qu'on vient de régler. */}
+            <FeriesJournee travailles={feriesTravailles} />
             <TramesJournee trames={trames} blocs={blocs} equipe={equipe} />
           </>
         ) : (
@@ -483,6 +507,17 @@ async function PartieJournees({
                     ))}
                   </ul>
                 )}
+                {/* B-210 — un vétérinaire LIT le réglage sans pouvoir le
+                    changer, comme les tranches juste au-dessus. Le taire
+                    laisserait sa semaine type s'appliquer autrement qu'il ne
+                    l'a écrite, sans qu'une ligne le lui dise. */}
+                <p className="conn-line">
+                  {feriesTravailles === null
+                    ? 'Le réglage des jours fériés n’a pas pu être lu.'
+                    : feriesTravailles
+                      ? 'Les jours fériés comptent comme des journées normales : les semaines types s’y appliquent.'
+                      : 'Les jours fériés ne reçoivent aucune présence : les semaines types ne s’y appliquent pas.'}
+                </p>
               </div>
             </div>
             <TramesJournee

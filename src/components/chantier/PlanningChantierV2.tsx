@@ -195,6 +195,16 @@ interface Props {
     tranche: string
     heures: string
   }[]
+  /**
+   * B-210 — le cabinet travaille-t-il les jours fériés en journée ?
+   *
+   * ⚠️ IL NE SERT QU'À NE PAS MENTIR. Un jour férié dans un cabinet fermé, une
+   *    récurrence « le mercredi » ne prévoit RIEN : le remplissage n'y pose
+   *    personne. Sans cette prop, la fenêtre affirmait « sa récurrence le
+   *    prévoyait » pendant que la grille, deux centimètres plus haut, affichait
+   *    l'étiquette « Férié ».
+   */
+  feriesTravailles?: boolean
   /** Nom du profil de planning de la période, s'il y en a un. */
   profil: string | null
   /** Périodes qui ont déjà des gardes — conditionne PDF et publication. */
@@ -342,6 +352,9 @@ export function PlanningChantierV2({
   conges,
   absencesDeclarees = [],
   recurrences = [],
+  // Replié sur « fermé », le sens qui FAIT TAIRE la mention. L'autre repli
+  // l'afficherait à tort, et c'est celui-là qui ment.
+  feriesTravailles = false,
   profil,
   periodesAvecGardes,
   periodesTypes,
@@ -1863,8 +1876,12 @@ export function PlanningChantierV2({
         // filtrage par date est fait ici (`trameViseCetteDate` porte la
         // convention de parité des semaines) : la fenêtre reçoit une liste
         // déjà vraie pour SA date, elle n'a pas à rejouer la règle.
+        // B-210 — UN JOUR FÉRIÉ FERMÉ NE PRÉVOIT RIEN. La liste est vidée, et
+        // `jourFerieFerme` dit POURQUOI : sans ce second signal, la fenêtre
+        // retomberait sur « Rien d'inscrit », dont le commentaire de la modale
+        // dit justement qu'il se lit « il ne travaille pas ce jour-là ».
         prevuParRecurrence={
-          cellule
+          cellule && !(!feriesTravailles && estJourFerie(cellule.date))
             ? recurrences
                 .filter(
                   (r) =>
@@ -1877,6 +1894,7 @@ export function PlanningChantierV2({
                 .map((r) => ({ tranche: r.tranche, heures: r.heures }))
             : []
         }
+        jourFerieFerme={!!cellule && !feriesTravailles && estJourFerie(cellule.date)}
         onFermer={() => setCellule(null)}
       />
 

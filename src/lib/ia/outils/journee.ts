@@ -98,6 +98,46 @@ async function chargerBlocs(ctx: ContexteOutil): Promise<BlocRow[]> {
   )
 }
 
+/**
+ * B-210 — le cabinet travaille-t-il les jours fériés en journée ?
+ *
+ * 🔑 CE N'EST PAS UN DÉTAIL DE CONFORT POUR FILOU. Sans cette ligne, à « quels
+ *    sont les jours d'Anne-Sophie ? » il répond « tous les mardis » — vrai onze
+ *    mois sur douze, faux le 25 décembre, et rien dans sa réponse ne signale
+ *    l'exception. C'est mot pour mot le défaut du 25/08 (« qui a accès au
+ *    planning ? » répondu sans le secrétariat) : le risque n'est jamais le
+ *    catalogue incomplet, c'est la réponse incomplète donnée comme complète.
+ *
+ * 🔴 L'ERREUR EST LUE, ET RENDUE — elle ne se replie PAS sur `false`.
+ *    C'était le défaut relevé par la revue du 13/11 : avec un repli muet,
+ *    Filou affirmait « ce cabinet est fermé les jours fériés, AUCUNE habitude
+ *    ne s'applique » à un cabinet qui a réglé l'inverse. Une réponse fausse
+ *    servie avec l'aplomb d'une réponse juste — précisément ce que la mise en
+ *    garde de cet outil existe pour empêcher.
+ *
+ *    `null` veut donc dire « je ne sais pas », et l'appelant le DIT au modèle
+ *    au lieu de trancher à sa place.
+ *
+ * ⚠️ `.maybeSingle()` SANS `.eq` : la policy `cabinets_select` borne déjà à
+ *    `auth_cabinet_actif()`. Elle est PERMISSIVE et seule — pas RESTRICTIVE :
+ *    une seconde policy PERMISSIVE ajoutée un jour s'additionnerait à elle, et
+ *    `maybeSingle()` renverrait alors une erreur sur plusieurs lignes. C'est
+ *    une raison de plus de lire l'erreur plutôt que de l'absorber.
+ */
+async function chargerFeriesTravailles(ctx: ContexteOutil): Promise<boolean | null> {
+  const { data, error } = await ctx.supabase
+    .from('cabinets')
+    .select('journees_feries_travailles')
+    .maybeSingle()
+
+  if (error) return null
+  const lu = (data as { journees_feries_travailles?: boolean } | null)
+    ?.journees_feries_travailles
+  // La colonne est `NOT NULL DEFAULT false` : une valeur absente sur une
+  // lecture SANS erreur ne vient pas du réglage, mais d'un cabinet introuvable.
+  return lu ?? null
+}
+
 async function chargerTrames(ctx: ContexteOutil): Promise<TrameRow[]> {
   return lignesLues<TrameRow>(
     await ctx.supabase
@@ -246,6 +286,8 @@ Appelle-le pour « qui travaille le mardi ? », « quels sont les jours d'Anne-S
 
 ⚠️ CE QUE CET OUTIL DIT, ET CE QU'IL NE DIT PAS. Ce sont les RÈGLES d'habitude, pas le planning réel : un congé validé n'y apparaît pas, et une retouche à la main sur une journée précise non plus. Quand on te demande qui est là à une DATE donnée, dis clairement que tu réponds d'après les habitudes et qu'il faut vérifier les congés — ne présente jamais ça comme le planning du jour.
 
+⚠️ LES JOURS FÉRIÉS SONT UNE EXCEPTION À TOUTES CES HABITUDES. Le champ jours_feries_travailles te dit si ce cabinet ouvre les jours fériés. Quand il est faux, AUCUNE habitude ne s'applique un jour férié : si la date demandée en est un, réponds que le cabinet est fermé ce jour-là, et ne récite pas la liste des habitudes comme si elle valait. Quand il vaut null, le réglage n'a pas pu être lu : dis-le, n'affirme rien sur les fériés. La phrase à suivre est dans note_jours_feries.
+
 Sans prénom, tu obtiens tout le cabinet.`,
   params: z.object({
     prenom: z.string().optional().describe("Pour n'avoir que les présences de cette personne."),
@@ -254,10 +296,11 @@ Sans prénom, tu obtiens tout le cabinet.`,
   async executer(params, ctx) {
     if (!(await moduleAllume(ctx))) return { module_eteint: true, message: REFUS_MODULE }
 
-    const [blocs, trames, equipe] = await Promise.all([
+    const [blocs, trames, equipe, feriesTravailles] = await Promise.all([
       chargerBlocs(ctx),
       chargerTrames(ctx),
       chargerEquipe(ctx),
+      chargerFeriesTravailles(ctx),
     ])
 
     let cible: VetoRow[] = equipe
@@ -274,6 +317,20 @@ Sans prénom, tu obtiens tout le cabinet.`,
       //    description de l'outil. Un modèle qui a lu la description dix tours
       //    plus tôt l'a déjà oubliée au moment de conclure.
       ceci_sont_des_habitudes_pas_le_planning_reel: true,
+      // B-210 — voyage AVEC la donnée, pour la même raison que la ligne
+      // ci-dessus : une exception lue dix tours plus tôt est une exception
+      // oubliée au moment de conclure.
+      jours_feries_travailles: feriesTravailles,
+      // 🔑 TROIS RÉPONSES, PAS DEUX. `null` = le réglage n'a pas pu être lu, et
+      //    ça se dit : trancher « fermé » dans ce cas ferait affirmer à Filou
+      //    qu'aucune habitude ne vaut un jour férié, dans un cabinet qui a
+      //    peut-être réglé l'inverse.
+      note_jours_feries:
+        feriesTravailles === null
+          ? 'Le réglage des jours fériés n’a pas pu être lu. Ne dis RIEN sur les jours fériés : dis que tu n’as pas pu vérifier, et renvoie vers Organisation › Journées.'
+          : feriesTravailles
+            ? 'Ce cabinet ouvre les jours fériés : les habitudes ci-dessous s’y appliquent comme un jour ordinaire.'
+            : 'Ce cabinet est fermé les jours fériés : AUCUNE des habitudes ci-dessous ne s’applique un jour férié.',
       personnes: cible.map((v) => {
         const miennes = trames.filter((t) => t.veterinaire_id === v.id)
         return {
