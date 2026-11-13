@@ -35,6 +35,9 @@ import type {
   JourSemaine,
 } from '../types'
 import { normaliserContraintesVets } from '../normaliserContraintes'
+// B-209 — la parité ISO vit à UN seul endroit. Renommée à l'import parce que ce
+// fichier a déjà son `estSemaineImpaireISO`, qui s'appuie dessus.
+import { estSemaineImpaire as estSemaineImpaireMoteur } from '../utils'
 // Les `detail` de ce fichier ne sont PAS des journaux techniques : ils
 // s'affichent tels quels dans la fenêtre de publication et dans le bandeau
 // d'incohérences, sous les yeux du cabinet. Une date y va donc en français.
@@ -233,17 +236,21 @@ function estSemaineImpaireAncree(
   return nbSem % 2 !== 0
 }
 
-/** Parité ISO globale (fallback quand aucune ancre n'est fournie) */
-function numeroSemaineISO(date: string): number {
-  const d = new Date(date + 'T12:00:00Z')
-  const jeudi = new Date(d)
-  jeudi.setUTCDate(d.getUTCDate() + (4 - (d.getUTCDay() || 7)))
-  const debutAnnee = new Date(Date.UTC(jeudi.getUTCFullYear(), 0, 1))
-  return Math.ceil(((jeudi.getTime() - debutAnnee.getTime()) / 86400000 + 1) / 7)
-}
-
+/**
+ * Parité ISO globale (fallback quand aucune ancre n'est fournie).
+ *
+ * ⚠️ B-209 — CE FICHIER PORTAIT SA PROPRE COPIE DU CALCUL, et elle portait donc
+ *    aussi le bug : toute l'année 2027 numérotée un cran trop haut, donc de
+ *    parité inversée. Le validateur et le moteur se trompaient de concert, ce
+ *    qui est pire qu'un désaccord : aucune alarme ne pouvait sonner.
+ *
+ *    Les helpers de date de ce fichier sont volontairement locaux (le
+ *    validateur se veut lisible d'un bloc), mais la PARITÉ n'est pas un helper
+ *    de confort : c'est une convention que trois endroits doivent lire à
+ *    l'identique. Elle vit désormais dans `engine/utils` et nulle part ailleurs.
+ */
 function estSemaineImpaireISO(date: string): boolean {
-  return numeroSemaineISO(date) % 2 !== 0
+  return estSemaineImpaireMoteur(date)
 }
 
 /**

@@ -67,9 +67,19 @@ describe('Le vocabulaire des trames', () => {
 
 describe('MÊME CONVENTION DE PARITÉ QUE LE MOTEUR — le piège n°1 du cadrage', () => {
   it('rend EXACTEMENT ce que rend le moteur, sur 400 jours consécutifs', () => {
-    // ⚠️ On compare les deux implémentations, on ne recopie pas des valeurs
-    //    attendues. Si le moteur change de convention, ce test rougit — c'est
-    //    précisément son travail : forcer les deux mondes à bouger ensemble.
+    // ⚠️ CE QUE CE TEST PROUVE, ET CE QU'IL NE PROUVE PAS (B-209).
+    //
+    //    Il prouve la DÉLÉGATION : que la trame n'a pas sa propre convention.
+    //    Le jour où quelqu'un basculera la trame sur une convention ancrée sans
+    //    toucher aux gardes, il rougira, et c'est son seul travail.
+    //
+    //    Il ne prouve RIEN sur la justesse des valeurs. `semaineImpairePourTrame`
+    //    délègue à `estSemaineImpaire` : les deux côtés de l'égalité sont le
+    //    même code. Si le moteur se trompe, ce test se trompe avec lui — et
+    //    c'est exactement ce qui est arrivé sur toute l'année 2027.
+    //    La justesse se prouve dans `src/engine/__tests__/utils.test.ts`, contre
+    //    une implémentation de référence écrite autrement, et dans le cas client
+    //    plus bas. Ne pas confondre les deux rôles.
     //
     //    400 jours, pas 365 : la fenêtre doit traverser DEUX changements d'année,
     //    parce que c'est là que la semaine ISO 53 produit son décalage.
@@ -96,13 +106,40 @@ describe('MÊME CONVENTION DE PARITÉ QUE LE MOTEUR — le piège n°1 du cadrag
   it('traverse la semaine ISO 53 de 2026 sans se taire', () => {
     // Contrepartie ASSUMÉE de l'absence d'ancre, documentée dans la migration et
     // dans `paramsRegle.ts` : au passage d'une année à 53 semaines, deux semaines
-    // impaires se suivent une fois. Ce test ne corrige rien — il PROUVE que le
-    // comportement est celui du moteur, pour que personne ne le « répare » d'un
-    // côté seulement.
-    const fin2026 = '2026-12-28' // lundi de la semaine ISO 53
-    const debut2027 = '2027-01-04' // lundi de la semaine ISO 1
-    expect(semaineImpairePourTrame(fin2026)).toBe(estSemaineImpaire(fin2026))
-    expect(semaineImpairePourTrame(debut2027)).toBe(estSemaineImpaire(debut2027))
+    // impaires se suivent une fois.
+    //
+    // 🔴 B-209 — CE TEST NOMMAIT DÉJÀ LA DATE DU BUG, ET IL PASSAIT.
+    //
+    //    Il s'écrivait ainsi :
+    //      expect(semaineImpairePourTrame(d)).toBe(estSemaineImpaire(d))
+    //    Or `semaineImpairePourTrame` est exactement `return estSemaineImpaire(d)`.
+    //    La comparaison était `x === x` : elle ne pouvait pas échouer, quelle que
+    //    soit la valeur. Le 2027-01-04 était sous nos yeux depuis des semaines,
+    //    rendait `false` au lieu de `true`, et le test le saluait au passage.
+    //
+    //    ⚠️ Un garde-fou qui compare une fonction à elle-même ne garde rien. Il
+    //       coûte même plus cher que pas de test du tout, parce qu'il fait croire
+    //       que l'endroit est couvert. On affirme désormais la VALEUR.
+    const fin2026 = '2026-12-28' // lundi de la semaine ISO 53 → impaire
+    const debut2027 = '2027-01-04' // lundi de la semaine ISO 1 → impaire
+    expect(semaineImpairePourTrame(fin2026)).toBe(true)
+    expect(semaineImpairePourTrame(debut2027)).toBe(true)
+    // Et les deux semaines impaires qui se suivent, dites explicitement.
+    expect(semaineImpairePourTrame('2027-01-11')).toBe(false) // la suivante, paire
+  })
+
+  it('LE CAS DU CLIENT — la semaine type d’Anne-Sophie au 4 janvier 2027', () => {
+    // Retour du Val d'Allier, 13/11 : « pourquoi le logiciel me met de repos
+    // lundi après-midi et mercredi journée alors que nous sommes en semaine
+    // impaire ? ». Sa semaine type, telle qu'elle est en base :
+    //   semaines IMPAIRES → lundi, mardi, mercredi en journée complète
+    //   semaines PAIRES   → lundi le matin seulement, pas de mercredi
+    // Le 4 janvier 2027 est la semaine 1, donc impaire : c'est la première
+    // ligne qui doit s'appliquer. Le calcul fautif rendait la seconde.
+    expect(trameViseCetteDate({ jour: 'lundi', semaine: 'impaire' }, '2027-01-04')).toBe(true)
+    expect(trameViseCetteDate({ jour: 'lundi', semaine: 'paire' }, '2027-01-04')).toBe(false)
+    expect(trameViseCetteDate({ jour: 'mercredi', semaine: 'impaire' }, '2027-01-06')).toBe(true)
+    expect(trameViseCetteDate({ jour: 'mercredi', semaine: 'paire' }, '2027-01-06')).toBe(false)
   })
 })
 

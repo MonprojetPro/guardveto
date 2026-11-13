@@ -51,7 +51,7 @@
 // ============================================================
 
 import { Lock } from 'lucide-react'
-import { estJourFerie } from '@/engine/utils'
+import { estJourFerie, numeroSemaine } from '@/engine/utils'
 import { stylePoint } from '@/lib/couleurs'
 import {
   effectifsDemiJournee,
@@ -156,16 +156,13 @@ export interface ProprietesGrille {
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-/** Le numéro de semaine ISO — le même repère que les trames de présence. */
-function numeroSemaine(iso: string): number {
-  const d = new Date(iso + 'T12:00:00Z')
-  const jour = (d.getUTCDay() + 6) % 7
-  d.setUTCDate(d.getUTCDate() - jour + 3)
-  const premierJeudi = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
-  const decalage = (premierJeudi.getUTCDay() + 6) % 7
-  premierJeudi.setUTCDate(premierJeudi.getUTCDate() - decalage + 3)
-  return 1 + Math.round((d.getTime() - premierJeudi.getTime()) / (7 * 86400000))
-}
+// B-209 — LE NUMÉRO DE SEMAINE N'EST PLUS CALCULÉ ICI.
+//
+// Cet écran portait la bonne formule, et le moteur une fausse : il affichait
+// « semaine 1 » pendant que le remplissage appliquait la semaine 2. Le client a
+// vu exactement ça — ses repos de semaine paire posés sur une semaine impaire.
+// Les deux lisent désormais `numeroSemaine` de `engine/utils`, qui a reçu cet
+// algorithme-ci. Avoir raison tout seul dans son coin n'a servi à personne.
 
 export function GrilleSemainesV2({
   semaines,

@@ -6,20 +6,82 @@ import type { JourSemaine, Saison, CalendrierResolu, PlanningPartiel, Attributio
 
 // ── Helpers de base ──────────────────────────────────────
 
-/** Numéro ISO de la semaine (1-53) */
+/**
+ * Numéro ISO de la semaine (1-53).
+ *
+ * ⚠️ B-209 — CE CALCUL A ÉTÉ FAUX SUR TOUTE L'ANNÉE 2027, et la formule fautive
+ *    était recopiée dans `validerPlanning.ts`. Ce qu'elle faisait :
+ *
+ *      Math.ceil(((jeudi - 1er janvier) / 86400000 + 1) / 7)
+ *
+ *    Le jeudi était pris à 12:00 (convention du projet) mais le 1er janvier à
+ *    00:00 : la soustraction portait une demi-journée de trop. `Math.ceil`
+ *    l'absorbe la plupart du temps — sauf quand le jeudi tombe pile sur un
+ *    multiple de 7 jours, où elle fait basculer au numéro SUIVANT. C'est le cas
+ *    de toutes les années qui commencent un vendredi : 362 jours de 2027 étaient
+ *    numérotés un cran trop haut, donc de PARITÉ INVERSÉE. Anne-Sophie a reçu
+ *    ses repos de semaine paire pendant la semaine 1, impaire (retour du 13/11).
+ *
+ * 🔒 CE QUI REND LA VERSION CI-DESSOUS JUSTE, et pas seulement « corrigée » :
+ *    elle ne compte plus des jours depuis le 1er janvier — une date qui n'est
+ *    pas forcément dans la semaine 1. Elle compte des SEMAINES ENTIÈRES entre
+ *    deux jeudis, et la définition ISO dit que le jeudi de la semaine du
+ *    4 janvier est le jeudi de la semaine 1. Les deux bornes sont à la même
+ *    heure : l'écart est un multiple exact de 7 jours, donc `Math.round` est
+ *    exact et non « assez proche ».
+ *
+ *    C'est l'algorithme que `GrilleSemainesV2` appliquait déjà de son côté —
+ *    d'où le symptôme : l'écran affichait « semaine 1 » pendant que le
+ *    remplissage appliquait la semaine 2. Les deux appelants passent désormais
+ *    par ici. Une convention recopiée n'est pas une convention.
+ */
 export function numeroSemaine(date: string): number {
   const d = new Date(date + 'T12:00:00Z')
-  const thursday = new Date(d)
-  thursday.setUTCDate(d.getUTCDate() + (4 - (d.getUTCDay() || 7)))
-  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1))
-  return Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  // Le jeudi de la semaine : c'est lui qui décide de quelle ANNÉE la semaine
+  // relève, et donc de son numéro (une semaine à cheval sur deux années
+  // appartient entièrement à celle de son jeudi).
+  const jourIndex = (d.getUTCDay() + 6) % 7 // 0 = lundi … 6 = dimanche
+  d.setUTCDate(d.getUTCDate() - jourIndex + 3)
+
+  // Le 4 janvier est TOUJOURS dans la semaine 1 (définition ISO) : le jeudi de
+  // sa semaine est donc le jeudi de la semaine 1 de cette année-là.
+  const premierJeudi = new Date(Date.UTC(d.getUTCFullYear(), 0, 4, 12))
+  premierJeudi.setUTCDate(
+    premierJeudi.getUTCDate() - ((premierJeudi.getUTCDay() + 6) % 7) + 3,
+  )
+
+  return 1 + Math.round((d.getTime() - premierJeudi.getTime()) / (7 * 86400000))
 }
 
 /**
- * Semaine impaire (numéro ISO % 2 !== 0)
- * @deprecated Utiliser estSemaineImpaireAncrée() qui résiste à la semaine ISO 53.
- *   Cette fonction retourne un résultat incorrect pour décembre 2026 (semaine 53 ISO)
- *   car elle se base sur le numéro ISO global au lieu d'un comptage relatif à une ancre.
+ * Semaine impaire (numéro ISO % 2 !== 0).
+ *
+ * ⛔ NE PAS « CORRIGER » CET APPEL EN `estSemaineImpaireAncrée`.
+ *
+ *    Cette fonction a longtemps porté un `@deprecated` invitant à le faire. Il a
+ *    été retiré le 13/11 (B-209) parce qu'il était un piège : suivre ce conseil
+ *    dans UN SEUL des quatre appelants recrée exactement la divergence que
+ *    B-209 vient de supprimer — « semaines impaires » voudrait dire une chose
+ *    dans les règles de garde et une autre dans la semaine type de journée, et
+ *    rien ne lèverait d'erreur. Le planning décalerait d'une semaine, en
+ *    silence, jusqu'à ce qu'un cabinet le lise.
+ *
+ *    Appelants, au 13/11 : `hard-constraints.ts` (repos fixe et alternance sans
+ *    ancre), `validation/validerPlanning.ts`, `lib/journee/trames.ts`.
+ *
+ * ⚠️ LA CONTREPARTIE, CONNUE ET ASSUMÉE : sans ancre, le numéro vient du
+ *    calendrier. Au passage d'une année à 53 semaines ISO, deux semaines
+ *    impaires se suivent une fois (le 2026-12-28 est en semaine 53, le
+ *    2027-01-04 en semaine 1). Ce n'est pas un défaut de calcul, c'est la
+ *    convention. La changer est une décision produit, pas une correction : elle
+ *    se prend avec MiKL, et elle fait bouger les gardes ET les journées DANS LE
+ *    MÊME COMMIT.
+ *
+ * ⚠️ TROU CONNU, NON FERMÉ (B-209a) : une date malformée rend `NaN`, et
+ *    `NaN % 2 !== 0` vaut `true`. N'importe quelle saisie invalide est donc
+ *    déclarée « semaine impaire » sans erreur ni trace. Épinglé par un test
+ *    dans `src/engine/__tests__/utils.test.ts` pour que ce soit visible plutôt
+ *    que silencieux.
  */
 export function estSemaineImpaire(date: string): boolean {
   return numeroSemaine(date) % 2 !== 0
@@ -34,8 +96,13 @@ export function estSemaineImpaire(date: string): boolean {
  * @param vacancesScolaires - Plages de vacances pour les recalages
  *
  * @example
- * // Sans vacances : comptage simple depuis l'ancre
- * estSemaineImpaireAncrée('2026-12-28', '2026-09-01', []) // 118 jours → semaine 16 → paire (false)
+ * // Sans vacances : comptage simple depuis l'ancre.
+ * // ⚠️ Cet exemple annonçait « 118 jours → semaine 16 → paire (false) » et
+ * //    c'était FAUX : la fonction ramène les deux bornes au LUNDI de leur
+ * //    semaine, donc du lundi 2026-08-31 au lundi 2026-12-28 il y a 119 jours,
+ * //    soit 17 semaines, soit IMPAIRE. Corrigé le 13/11 (B-209) après
+ * //    exécution ; le test `utils.test.ts` attendait déjà `true`.
+ * estSemaineImpaireAncrée('2026-12-28', '2026-09-01', []) // 17 semaines → impaire (true)
  *
  * // Avec vacances : l'ancre se recale au début des vacances
  * estSemaineImpaireAncrée('2026-11-02', '2026-09-01', [{ debut: '2026-10-17', fin: '2026-10-31' }])
