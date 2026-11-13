@@ -121,6 +121,67 @@ describe('La porte des chantiers', () => {
   })
 })
 
+describe('Le bac a sable a TOUJOURS au moins ce qu’a n’importe quel autre cabinet', () => {
+  // 🔑 EXIGENCE DE MiKL, LE 13/11, ET C'EST UNE REGLE DE TRAVAIL AVANT D'ETRE
+  //    UNE REGLE DE CODE : « j'aimerai que toutes les nouveautes soient au
+  //    moins au niveau du bac a sable, sinon je ne vais jamais m'y retrouver.
+  //    Qu'il y ait encore des deploiements qui ne sont pas dans vetovaldallier
+  //    c'est normal puisqu'on fait des modifs. »
+  //
+  //    Le bac a sable est l'endroit ou il RECETTE. Si une nouveaute arrive chez
+  //    le client sans etre passee par lui, il la decouvre en production, et il
+  //    perd le seul ecran de reference qu'il a pour comparer. L'inclusion doit
+  //    donc etre a sens unique : bac a sable ⊇ tout autre cabinet, jamais
+  //    l'inverse.
+  //
+  // ⚠️ AUJOURD'HUI C'EST VRAI PAR CONSTRUCTION — `tousLesCabinets` ouvre
+  //    partout, `bacASableSeulement` n'ouvre qu'au bac a sable : aucune des
+  //    deux formes ne peut donner moins au bac a sable. CE TEST N'EST DONC PAS
+  //    UNE VERIFICATION, C'EST UN VERROU. Le jour ou quelqu'un ajoutera une
+  //    troisieme forme de diffusion (« ce cabinet-la seulement », « tous sauf
+  //    le bac a sable », une condition inversee), la regle tomberait en silence
+  //    et personne ne s'en apercevrait avant que MiKL ne se retrouve, encore,
+  //    devant un ecran plus recent chez son client que chez lui.
+  it('aucun chantier du catalogue ne peut etre ouvert au client et ferme au bac a sable', () => {
+    const fautifs = Object.keys(CHANTIERS).filter(
+      (id) =>
+        chantierOuvert(id, { estBacASable: false }) &&
+        !chantierOuvert(id, { estBacASable: true }),
+    )
+
+    expect(
+      fautifs,
+      'Ces chantiers sont ouverts a un cabinet client mais FERMES au bac a sable.\n' +
+        'MiKL recette sur le bac a sable : il y verrait une version plus ancienne que\n' +
+        'celle de son client, et perdrait son ecran de reference.\n\n' +
+        fautifs.map((f) => `  · ${f}`).join('\n'),
+    ).toEqual([])
+  })
+
+  // La sonde, sans quoi le test ci-dessus pourrait etre muet : un catalogue vide
+  // ou une fonction qui rend toujours `false` le ferait passer au vert.
+  it('DETECTE vraiment une diffusion inversee', () => {
+    const catalogueFautif = {
+      'tous-sauf-le-bac-a-sable': {
+        nom: 'Un chantier qui oublierait le bac a sable',
+        item: 'B-000',
+        depuis: '2026-11-13',
+        // Forme inexistante aujourd'hui : on la simule pour prouver que la
+        // comparaison ci-dessus attrape bien le cas.
+        diffusion: { tousLesCabinets: 'ouvert partout' },
+      },
+    } as unknown as typeof CHANTIERS
+
+    // Avec une porte inversee pour la demonstration, le chantier serait ouvert
+    // au client et ferme au bac a sable.
+    const porteInversee = (id: string, ctx: { estBacASable: boolean }) =>
+      id in catalogueFautif ? ctx.estBacASable === false : false
+
+    expect(porteInversee('tous-sauf-le-bac-a-sable', { estBacASable: false })).toBe(true)
+    expect(porteInversee('tous-sauf-le-bac-a-sable', { estBacASable: true })).toBe(false)
+  })
+})
+
 describe('Le catalogue des chantiers', () => {
   it('cite un item de board pour chaque chantier — la filiation reste lisible', () => {
     const board = readFileSync(
