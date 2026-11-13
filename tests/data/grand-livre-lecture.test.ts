@@ -111,7 +111,13 @@ describe('chargerGrandLivre — ce qu’il demande à la base', () => {
     const { client, appels } = faireClient({ periodes: [] })
     const livre = await chargerGrandLivre(client, '2026-11-30', ['v1'])
     expect(appels.some((a) => a.table === 'bonus_malus')).toBe(false)
-    expect(livre).toEqual({ cumul: {}, report: {}, nbPeriodes: 0, erreur: null })
+    expect(livre).toEqual({
+      cumul: {}, report: {}, nbPeriodes: 0, nbPeriodesCloses: 0,
+      horsRotation: [],
+      // La porte EST ouverte : cette fonction n'est appelee qu'ainsi.
+      chantierOuvert: true,
+      erreur: null,
+    })
   })
 })
 

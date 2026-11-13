@@ -39,8 +39,43 @@ export interface GrandLivre {
   cumul: Record<string, CumulEcarts>
   /** Report appliqué par le moteur : cumul inversé puis PLAFONNÉ, effectif seul. */
   report: ReportEquiteMap
-  /** Nombre de périodes closes cumulées — pour pouvoir le DIRE à l'écran. */
+  /** Periodes closes qui ont VRAIMENT un bilan — celles qui nourrissent le cumul. */
   nbPeriodes: number
+  /**
+   * Periodes closes AVANT celle-ci, bilan ou pas.
+   *
+   * ⚠️ DIFFERENT de `nbPeriodes`, et la difference porte un message. Un
+   * bilan n'existe que si quelqu'un a clique « Calculer le bilan » ou que
+   * le cron a verrouille la periode. Le cas courant — periode precedente
+   * publiee, bilan jamais calcule — donne donc `nbPeriodes: 0` avec des
+   * periodes closes bien reelles. Sans ce second compteur, l'ecran disait
+   * « aucune periode close avant celle-ci : rien a rattraper » : une bonne
+   * nouvelle fausse, qui masquait en plus le geste qui debloque tout.
+   */
+  nbPeriodesCloses: number
+  /**
+   * Les vetos qui ont un ecart mais AUCUN rattrapage possible : le dernier
+   * recours, hors de l'effectif de generation.
+   *
+   * ⚠️ DONNE EXPLICITEMENT, JAMAIS DEDUIT. L'ecran le deduisait d'un
+   * `cumul` sans `report` — or `construireReport` n'enregistre pas un
+   * report entierement nul, donc tout veto dont les ecarts s'annulent
+   * (+1 une periode, -1 la suivante : cas banal) tombait dans le meme
+   * sac. Anne-So lisait alors, nommement, qu'un de ses titulaires
+   * « n'est pas candidat aux gardes ». Releve par la revue du 13/11.
+   */
+  horsRotation: string[]
+  /**
+   * Le chantier `equite-grand-livre` est-il ouvert a ce cabinet ?
+   *
+   * ⚠️ DECISIF POUR CE QUE L'ECRAN A LE DROIT D'AFFIRMER. Porte fermee, le
+   * report rendu vient de `chargerReportDAvant` : les week-ends de la SEULE
+   * periode precedente, SANS plafond. Une carte qui parlerait alors de
+   * « rattrapage etale, au plus un week-end par periode » decrirait un
+   * mecanisme que ce cabinet n'a pas. Verifie en base le 2026-11-13 : le
+   * Val d'Allier n'est PAS bac a sable, la porte y est donc fermee.
+   */
+  chantierOuvert: boolean
   /**
    * Erreur de lecture, jamais avalée (règle de maison n°1 de useCompteurs) :
    * un `?? []` transformerait « je n'ai pas pu lire l'historique » en
@@ -50,7 +85,10 @@ export interface GrandLivre {
   erreur: string | null
 }
 
-const VIDE: GrandLivre = { cumul: {}, report: {}, nbPeriodes: 0, erreur: null }
+const VIDE: GrandLivre = {
+  cumul: {}, report: {}, nbPeriodes: 0, nbPeriodesCloses: 0,
+  horsRotation: [], chantierOuvert: false, erreur: null,
+}
 
 /**
  * chargerGrandLivre — cumule les bilans de toutes les périodes de GARDES
@@ -86,7 +124,7 @@ export async function chargerGrandLivre(
   if (errPeriodes) return { ...VIDE, erreur: errPeriodes.message }
 
   const ids = ((periodes as { id: string }[] | null) ?? []).map((p) => p.id)
-  if (ids.length === 0) return VIDE
+  if (ids.length === 0) return { ...VIDE, chantierOuvert: true }
 
   const { data: bilans, error: errBilans } = await supabase
     .from('bonus_malus')
@@ -97,9 +135,20 @@ export async function chargerGrandLivre(
 
   const lignes = (bilans as (LigneBilan & { periode_id: string })[] | null) ?? []
 
+  // Qui a un ecart mais n'est pas dans l'effectif d'equite : le dernier
+  // recours. Calcule ICI, ou l'on connait les deux ensembles, et non
+  // devine a l'ecran depuis une absence de report.
+  const perimetre = new Set(vetIds)
+  const cumul = cumulerEcarts(lignes)
+
   return {
-    cumul: cumulerEcarts(lignes),
+    // Cette fonction n'est appelee QUE porte ouverte : `chargerGrandLivre-
+    // PourAffichage` et `engine/loader.ts` arbitrent tous deux en amont.
+    chantierOuvert: true,
+    cumul,
     report: construireReport(lignes, vetIds),
+    horsRotation: Object.keys(cumul).filter((id) => !perimetre.has(id)),
+    nbPeriodesCloses: ids.length,
     // Les périodes qui ont RÉELLEMENT un bilan, pas celles qui sont closes :
     // une période jamais clôturée n'apporte rien au cumul, et annoncer
     // « sur 4 périodes » ferait croire à un historique plus complet qu'il
@@ -190,5 +239,12 @@ export async function chargerReportDAvant(
     cumul[b.veterinaire_id] = { we: b.ecart_we ?? 0, semaine: 0, feries: 0 }
   }
 
-  return { cumul, report, nbPeriodes: 1, erreur: null }
+  return {
+    cumul, report, nbPeriodes: 1, nbPeriodesCloses: 1,
+    // L'ancien chemin ne connait pas l'effectif : il ne peut rien dire du
+    // hors-rotation, et ne doit donc rien en dire.
+    horsRotation: [],
+    chantierOuvert: false,
+    erreur: null,
+  }
 }

@@ -42,6 +42,8 @@ const VICTOR_EN_DETTE: GrandLivreAffiche = {
   cumul: { victor: { we: 3, semaine: 2, feries: 1 } },
   report: { victor: { we: -1, semaine: -2, feries: -1 } },
   nbPeriodes: 3,
+  nbPeriodesCloses: 3,
+  chantierOuvert: true,
 }
 
 describe('Bilan de la période — ce que le moteur rattrape', () => {
@@ -74,7 +76,7 @@ describe('Bilan de la période — ce que le moteur rattrape', () => {
   })
 
   it('sans aucun historique, la colonne ne s’affiche pas du tout', () => {
-    const html = rendre({ cumul: {}, report: {}, nbPeriodes: 0 })
+    const html = rendre({ cumul: {}, report: {}, nbPeriodes: 0, nbPeriodesCloses: 0, chantierOuvert: true })
     expect(html).not.toContain('Rattrapage sur cette période')
   })
 
@@ -82,7 +84,7 @@ describe('Bilan de la période — ce que le moteur rattrape', () => {
     // Sans ce message, un historique illisible rend exactement le même
     // écran qu'un historique vide : la colonne disparaît et l'admin lit
     // une équipe à jour. Personne ne va vérifier une bonne nouvelle.
-    const html = rendre({ cumul: {}, report: {}, nbPeriodes: 0, erreur: 'timeout' })
+    const html = rendre({ cumul: {}, report: {}, nbPeriodes: 0, nbPeriodesCloses: 0, chantierOuvert: true, erreur: 'timeout' })
     expect(html).toContain('n’a pas pu être lu')
     expect(html).toContain('ce n’est pas qu’il n’y a rien à rattraper')
     // Et le message de panne ne révèle pas le détail technique à l'admin.
@@ -96,6 +98,8 @@ describe('Bilan de la période — ce que le moteur rattrape', () => {
       cumul: { victor: { we: 3, semaine: 0, feries: 0 } },
       report: { victor: { we: -1, semaine: 0, feries: 0 } },
       nbPeriodes: 3,
+      nbPeriodesCloses: 3,
+      chantierOuvert: true,
     })
     expect(html).toContain('1 week-end en moins')
     // ⚠️ On vise la forme du RATTRAPAGE (« … en moins »), pas les mots
@@ -125,6 +129,9 @@ describe('Bilan de la période — le dernier recours ne reçoit pas de promesse
           },
           report: { victor: { we: -1, semaine: 0, feries: 0 } },
           nbPeriodes: 3,
+          nbPeriodesCloses: 3,
+          horsRotation: ['fanny'],
+          chantierOuvert: true,
         }}
         vetsInfo={VETS}
       />,

@@ -25,6 +25,7 @@ import { BarreV2 } from '@/components/v2/BarreV2'
 import { EnteteHistoriqueVide } from '@/components/v2/ImportPlanningLanceur'
 import { HistoriqueV2, type CumulLigne } from '@/components/v2/HistoriqueV2'
 import { BonusMalusCard } from '@/components/compteurs/BonusMalusCard'
+import { RattrapageCard } from '@/components/compteurs/RattrapageCard'
 import { HistoriqueFetesCard } from '@/components/compteurs/HistoriqueFetesCard'
 import { chargerSoirsDeFete } from '@/lib/compteurs/fetesParSoir'
 import { chargerDock } from '@/data/v2/dock'
@@ -423,6 +424,22 @@ export default async function HistoriquePage({
   const afficherBilan =
     estAdmin && mode === 'periode' && periodeSelectionnee.statut !== 'brouillon'
 
+  // B-211 — LE RATTRAPAGE N'ATTEND PAS LA PUBLICATION, et c'est tout
+  // l'objet du correctif. MiKL, 13/11 : « c'est dommage que ca n'apparaisse
+  // pas quand meme nan ? ». La condition ci-dessus est legitime pour le
+  // BILAN (rien a mesurer sur une periode vide), mais elle masquait aussi
+  // le rattrapage, qui vient des periodes PASSEES et ne doit rien a celle
+  // en cours. Il est connu avant meme la generation — et c'est la qu'il
+  // sert, puisqu'il annonce ce que le moteur va corriger.
+  //
+  // ⚠️ PAS DE CONDITION SUR LE MODE, contrairement a `afficherBilan`. Le
+  // rattrapage ne depend ni du filtre ni des dates affichees : il est lu a
+  // `periodeSelectionnee.date_debut`, qui reste defini en mode « plage ».
+  // Premiere version : elle exigeait `mode === 'periode'`, donc un clic sur
+  // « Plage libre » faisait disparaitre la carte sans un mot — l'admin y
+  // aurait lu un bug, ou un rattrapage solde. Releve par la revue du 13/11.
+  const afficherRattrapage = estAdmin && periodeSelectionnee.statut === 'brouillon'
+
   // B-196 lot 0 — le grand livre d'équité, lu par la MÊME fonction que le
   // moteur (`data/grandLivreEquite`). Avant, cet écran lisait l'écart de
   // week-ends de la seule période précédente et l'affichait comme « le
@@ -430,7 +447,9 @@ export default async function HistoriquePage({
   // ne le signale. Le périmètre est l'effectif réel, dernier recours exclu,
   // exactement comme à la génération.
   const [grandLivre, bonusMalusCourant, vetsInfo, historiqueFetes] = await Promise.all([
-    estAdmin && mode === 'periode'
+    // Charge des que l'admin est la : le rattrapage s'affiche aussi en mode
+    // « plage » (cf. `afficherRattrapage` ci-dessus).
+    estAdmin
       ? chargerGrandLivrePourAffichage(
           supabase,
           periodeSelectionnee.date_debut,
@@ -442,7 +461,9 @@ export default async function HistoriquePage({
         )
       : Promise.resolve({ cumul: {}, report: {}, nbPeriodes: 0, erreur: null }),
     afficherBilan ? queryBonusMalusCourant(supabase, periodeSelectionnee.id) : Promise.resolve([]),
-    afficherBilan ? queryVetsInfo(supabase) : Promise.resolve([]),
+    // B-211 — necessaire aux DEUX cartes : sans lui, le rattrapage
+    // afficherait des identifiants au lieu de prenoms.
+    afficherBilan || afficherRattrapage ? queryVetsInfo(supabase) : Promise.resolve([]),
     estAdmin ? queryHistoriqueFetes(supabase) : Promise.resolve([]),
   ])
 
@@ -486,6 +507,10 @@ export default async function HistoriquePage({
                 grandLivre={grandLivre}
                 vetsInfo={vetsInfo}
               />
+            ) : afficherRattrapage ? (
+              // Periode en preparation : pas de bilan a montrer, mais le
+              // rattrapage existe deja. Jamais les deux cartes a la fois.
+              <RattrapageCard grandLivre={grandLivre} vetsInfo={vetsInfo} />
             ) : undefined
           }
           slotFetes={
