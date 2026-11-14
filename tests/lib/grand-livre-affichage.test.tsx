@@ -47,22 +47,30 @@ const VICTOR_EN_DETTE: GrandLivreAffiche = {
 }
 
 describe('Bilan de la période — ce que le moteur rattrape', () => {
-  it('la colonne ne parle plus du « tour d’avant » ni d’un hypothétique tour suivant', () => {
+  it('PLUS DE 6e COLONNE — le rattrapage vit sous la pastille de sa dimension', () => {
+    // 🔴 B-211a. La colonne « Rattrapage sur cette période » portait une
+    // PHRASE dans une cellule de `.count-table` : sur téléphone, le
+    // tableau sortait de sa carte (317 px pour 306), l'en-tête s'affichait
+    // « RATTR APAGE SUR CETTE PÉRIOD E » et le texte était tronqué.
+    // Mesuré au banc le 14/11. Le rattrapage est maintenant sous la
+    // pastille de chaque dimension : rien ne s'élargit.
     const html = rendre(VICTOR_EN_DETTE)
-    expect(html).toContain('Rattrapage sur cette période')
+    expect(html).not.toContain('Rattrapage sur cette période')
     expect(html).not.toContain('Report du tour d')
+    expect(html).not.toContain('1 week-end en moins')
   })
 
-  it('le rattrapage est dit en français, pas en signe plus-moins', () => {
+  it('chaque dimension porte SON rattrapage, collé à son chiffre', () => {
     const html = rendre(VICTOR_EN_DETTE)
-    expect(html).toContain('1 week-end en moins')
-    expect(html).toContain('2 nuits de semaine en moins')
-    expect(html).toContain('1 jour férié en moins')
+    expect(html).toContain('rattrape −1') // week-ends, et fériés
+    expect(html).toContain('rattrape −2') // nuits de semaine
   })
 
-  it('l’infobulle dit la dette RÉELLE et sur combien de périodes', () => {
-    // C'est elle qui empêche la phrase rassurante : le tableau montre 1
-    // week-end rattrapé, l'infobulle dit qu'il y en a 3 de retard.
+  it('l’infobulle dit toujours la dette RÉELLE — c’est ce qui remplace la phrase', () => {
+    // ⚠️ Ce test a ÉTÉ ROUGE une minute le 14/11 : en retirant la colonne,
+    // j'avais retiré l'infobulle avec. Le tableau montre 1 week-end
+    // rattrapé ; sans elle, rien ne dit qu'il y en a 3 de retard. C'est
+    // exactement la « phrase rassurante » que tout ce chantier combat.
     const html = rendre(VICTOR_EN_DETTE)
     expect(html).toContain('Avant cette période, sur 3 périodes closes')
     expect(html).toContain('3 week-ends de plus')
@@ -71,13 +79,15 @@ describe('Bilan de la période — ce que le moteur rattrape', () => {
 
   it('celui qui n’a rien à rattraper ne reçoit pas de chiffre inventé', () => {
     const html = rendre(VICTOR_EN_DETTE)
-    // Fanny n'a ni cumul ni report : sa case reste muette.
+    // Fanny n'a ni cumul ni report : aucune mention sous ses pastilles.
     expect(html).toContain('ecart none')
   })
 
-  it('sans aucun historique, la colonne ne s’affiche pas du tout', () => {
+  it('sans aucun historique, aucune mention de rattrapage', () => {
     const html = rendre({ cumul: {}, report: {}, nbPeriodes: 0, nbPeriodesCloses: 0, chantierOuvert: true })
-    expect(html).not.toContain('Rattrapage sur cette période')
+    expect(html).not.toContain('rattrape ')
+    // Mais la carte, elle, s'affiche : le bilan reste son métier.
+    expect(html).toContain('Bilan de la période')
   })
 
   it('UNE PANNE DE LECTURE SE DIT — elle ne se lit pas « rien à rattraper »', () => {
@@ -101,19 +111,15 @@ describe('Bilan de la période — ce que le moteur rattrape', () => {
       nbPeriodesCloses: 3,
       chantierOuvert: true,
     })
-    expect(html).toContain('1 week-end en moins')
-    // ⚠️ On vise la forme du RATTRAPAGE (« … en moins »), pas les mots
-    // « nuits de semaine » tout court : ils apparaissent aussi dans
-    // l'infobulle, qui explique le plafond. Première version de ce test :
-    // `not.toContain('nuits de semaine')`, qui échouait sur sa propre
-    // explication.
-    expect(html).not.toContain('nuits de semaine en moins')
-    expect(html).not.toContain('nuit de semaine en moins')
+    // Le week-end porte son rattrapage, les deux autres dimensions non.
+    expect(html).toContain('rattrape −1')
+    expect(html).not.toContain('rattrape −2')
+    expect(html).not.toContain('rattrape +')
   })
 })
 
 describe('Bilan de la période — le dernier recours ne reçoit pas de promesse', () => {
-  it('un cumul SANS report se dit « hors rotation », pas « sera rattrapé »', () => {
+  it('un cumul SANS report se dit « hors rotation », sous le nom', () => {
     // Anne-Catherine traîne -12 gardes de semaine au Val d'Allier. Le grand
     // livre la cumule (l'écran peut vouloir le montrer) mais ne lui donne
     // aucun report : elle est retirée de l'effectif avant d'être candidate.

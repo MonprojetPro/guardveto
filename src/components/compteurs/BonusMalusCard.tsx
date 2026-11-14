@@ -79,6 +79,34 @@ interface Ligne {
   ecart_grands_we: number
 }
 
+/**
+ * Ce que le moteur rattrape sur CETTE dimension, sous la pastille.
+ *
+ * ⚠️ PLUS DE 6e COLONNE, et c'est tout l'objet du correctif B-211a. La
+ * colonne « Rattrapage sur cette période » portait une PHRASE entière
+ * (« 1 week-end en moins, 2 nuits de semaine en moins ») dans une cellule
+ * de `.count-table`, centrée et en gras : sur téléphone le tableau sortait
+ * de sa carte (317 px pour 306), l'en-tête s'affichait « RATTR APAGE SUR
+ * CETTE PÉRIOD E » et le texte s'empilait sur six lignes avant d'être
+ * tronqué. Mesuré au banc le 14/11.
+ *
+ * Le rattrapage de chaque dimension vit donc SOUS la pastille de cette
+ * dimension, là où le tableau a déjà sa place : rien ne s'élargit.
+ */
+function Rattrape({ valeur, titre }: { valeur: number; titre: string }) {
+  if (valeur === 0) return null
+  return (
+    // ⚠️ L'infobulle porte l'ECART ACCUMULE, pas une phrase generique.
+    // En retirant la 6e colonne on retire la phrase du tableau : si le
+    // cumul ne se retrouvait pas ici, on perdrait la seule chose qui dit
+    // qu'il reste 3 week-ends derriere un rattrapage de 1. Les tests du
+    // 13/11 l'ont attrape a la seconde ou elle a disparu.
+    <small className="bm-part" title={titre}>
+      rattrape {valeur > 0 ? `+${valeur}` : `−${Math.abs(valeur)}`}
+    </small>
+  )
+}
+
 /** « 3 sur 2,3 » — le réalisé face à la part théorique, en français. */
 function Part({ realise, quota }: { realise: number; quota: number }) {
   return (
@@ -172,6 +200,8 @@ export function BonusMalusCard({
   const detaille = bilan !== null
   // Une colonne de rattrapage ne s'affiche que si QUELQU'UN a quelque chose
   // à rattraper — sinon elle alignerait des tirets muets.
+  // Y a-t-il quelque chose a rattraper ? Sert desormais a la NOTE de bas
+  // de carte, plus a une colonne.
   const unReport = lignes.some((l) => phraseRattrapage(grandLivre.report[l.veterinaire_id]) !== null)
   // 🔴 B-200 — « il manque des colonnes ? ça n'a pas été mis à jour ». L'écart
   //    des grands week-ends est calculé et ENREGISTRÉ depuis le début
@@ -209,8 +239,8 @@ export function BonusMalusCard({
         // « personne ne traîne rien » : une salle vide, pas un angle mort.
         <p className="count-note" role="status">
           <b>Le report des périodes passées n’a pas pu être lu.</b> Les écarts
-          ci-dessous restent justes pour cette période, mais la colonne du
-          rattrapage est absente — ce n’est pas qu’il n’y a rien à rattraper.
+          ci-dessous restent justes pour cette période, mais ce que le moteur
+          rattrape n’est pas affiché — ce n’est pas qu’il n’y a rien à rattraper.
         </p>
       )}
 
@@ -224,7 +254,6 @@ export function BonusMalusCard({
                 <th>Nuits de semaine de garde</th>
                 <th>Jours fériés de garde</th>
                 {desSalaries && <th>Week-ends libres (salariés)</th>}
-                {unReport && <th>Rattrapage sur cette période</th>}
               </tr>
             </thead>
             <tbody>
@@ -235,18 +264,61 @@ export function BonusMalusCard({
                       <i style={stylePoint(l.couleur)} />
                       {l.prenom} {l.nom}
                     </span>
+                    {horsRotation(grandLivre, l.veterinaire_id) && (
+                      // Sans cette mention, le dernier recours n'a aucun
+                      // « rattrape » sous ses pastilles et RIEN ne dit
+                      // pourquoi : son ecart se lirait comme un oubli.
+                      <small
+                        className="bm-part"
+                        title={phraseCumul(
+                          grandLivre.cumul[l.veterinaire_id],
+                          grandLivre.nbPeriodes,
+                          true,
+                          grandLivre.chantierOuvert === true,
+                        )}
+                      >
+                        hors rotation
+                      </small>
+                    )}
                   </td>
                   <td>
                     <Ecart valeur={l.ecart_we} />
                     {detaille && <Part realise={l.we_realise} quota={l.we_quota} />}
+                    <Rattrape
+                      valeur={grandLivre.report[l.veterinaire_id]?.we ?? 0}
+                      titre={phraseCumul(
+                        grandLivre.cumul[l.veterinaire_id],
+                        grandLivre.nbPeriodes,
+                        horsRotation(grandLivre, l.veterinaire_id),
+                        grandLivre.chantierOuvert === true,
+                      )}
+                    />
                   </td>
                   <td>
                     <Ecart valeur={l.ecart_semaine} />
                     {detaille && <Part realise={l.sem_realise} quota={l.sem_quota} />}
+                    <Rattrape
+                      valeur={grandLivre.report[l.veterinaire_id]?.semaine ?? 0}
+                      titre={phraseCumul(
+                        grandLivre.cumul[l.veterinaire_id],
+                        grandLivre.nbPeriodes,
+                        horsRotation(grandLivre, l.veterinaire_id),
+                        grandLivre.chantierOuvert === true,
+                      )}
+                    />
                   </td>
                   <td>
                     <Ecart valeur={l.ecart_feries} />
                     {detaille && <Part realise={l.feries_realise} quota={l.feries_quota} />}
+                    <Rattrape
+                      valeur={grandLivre.report[l.veterinaire_id]?.feries ?? 0}
+                      titre={phraseCumul(
+                        grandLivre.cumul[l.veterinaire_id],
+                        grandLivre.nbPeriodes,
+                        horsRotation(grandLivre, l.veterinaire_id),
+                        grandLivre.chantierOuvert === true,
+                      )}
+                    />
                   </td>
                   {desSalaries && (
                     <td>
@@ -260,23 +332,6 @@ export function BonusMalusCard({
                       )}
                     </td>
                   )}
-                  {unReport && (
-                    <td
-                      title={phraseCumul(
-                        grandLivre.cumul[l.veterinaire_id],
-                        grandLivre.nbPeriodes,
-                        // Un cumul SANS report = quelqu'un que le moteur
-                        // n'appellera pas (cf. `construireReport`).
-                        horsRotation(grandLivre, l.veterinaire_id),
-                        // La phrase sur le plafond ne vaut que porte ouverte.
-                        grandLivre.chantierOuvert === true,
-                      )}
-                    >
-                      {phraseRattrapage(grandLivre.report[l.veterinaire_id]) ?? (
-                        <span className="ecart none">—</span>
-                      )}
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
@@ -286,6 +341,13 @@ export function BonusMalusCard({
             <b>+</b> signifie qu’il a fait <b>plus</b> que sa part : le moteur lui en
             donnera moins au prochain tour. <b>−</b> signifie l’inverse : il passera
             devant. <b>=</b> signifie qu’il est dans sa juste part.
+            {unReport && (
+              <>
+                {' '}
+                <b>« rattrape »</b> sous une pastille est ce que le moteur corrige
+                sur cette période, en tenant compte des périodes closes d’avant.
+              </>
+            )}
             {!detaille && (
               <>
                 {' '}
